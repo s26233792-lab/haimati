@@ -411,7 +411,7 @@ def call_nanobanana_api(image_path, style, clothing, background):
     import mimetypes
     mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
 
-    # ==================== 构建完整 prompt (JSON 格式) ====================
+    # ==================== 构建完整 prompt (文本格式) ====================
     # 服装处理
     clothing_map = {
         'business_suit': '商务西装',
@@ -430,36 +430,25 @@ def call_nanobanana_api(image_path, style, clothing, background):
         'warm': '暖色'
     }
 
-    prompt_json = {
-        "主体转换任务": {
-            "目标风格": "美式专业职场风格",
-            "肖像类型": "正面半身肖像"
-        },
-        "人物特征保留": {
-            "五官": "100%还原原始五官特征",
-            "发型": "保留原始发型",
-            "身份一致性": "严格保持原始身份"
-        },
-        "视觉与构图": {
-            "背景环境": f"质感影棚背景，柔和自然光，背景略微虚化，{background_map.get(background, '灰色')}色背景",
-            "画质细节": "清晰对焦，肤色真实自然，构图干净优雅",
-            "镜头语言": "微微倾斜镜头"
-        },
-        "姿态动作": {
-            "体态": "如军人般挺拔，强调宽肩",
-            "角度": "非正面（身体微侧，面部朝前）"
-        },
-        "服装": clothing_map.get(clothing, '商务西装'),
-        "画面尺寸": "3:4"
-    }
+    # 构建文本 prompt
+    prompt_text = f"""美式专业职场风格肖像照，正面半身肖像。
+
+人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份。
+
+服装：{clothing_map.get(clothing, '商务西装')}。
+
+背景：{background_map.get(background, '灰色')}色背景，质感影棚背景，柔和自然光，背景略微虚化。
+
+姿态：如军人般挺拔，强调宽肩，非正面（身体微侧，面部朝前）。
+
+画质：清晰对焦，肤色真实自然，构图干净优雅，微微倾斜镜头。
+
+画面尺寸：3:4"""
 
     # ==================== 构建请求 payload ====================
-    # 将 prompt JSON 转换为字符串
-    prompt_str = json.dumps(prompt_json, ensure_ascii=False)
-
     payload = {
         "model": "gemini-3-pro-image-preview",  # 指定模型
-        "prompt": prompt_str,  # prompt 需要是字符串
+        "prompt": prompt_text,  # prompt 为文本格式
         "image": image_data
     }
 
