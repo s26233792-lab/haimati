@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import json
 import sys
 import time
+import urllib.parse
 
 # Windows 控制台编码修复
 if sys.platform == 'win32':
@@ -24,18 +25,49 @@ if sys.platform == 'win32':
 from dotenv import load_dotenv
 load_dotenv()
 
-# Railway 环境检测 - 使用 /tmp 目录存储数据
+# ==================== 数据库配置 ====================
+# 支持 PostgreSQL (Railway 生产环境) 和 SQLite (本地开发)
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+# Railway 环境检测 - 使用 PostgreSQL 或 SQLite
 is_railway = os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_VOLUME_PATH')
 if is_railway:
-    base_dir = '/tmp/portrait_app'
-    os.makedirs(base_dir, exist_ok=True)
-    upload_folder = os.path.join(base_dir, 'uploads')
-    db_path = os.path.join(base_dir, 'codes.db')
+    # Railway 环境：优先使用 PostgreSQL，否则使用持久化 SQLite
+    if DATABASE_URL:
+        # Railway 会自动提供 DATABASE_URL 给 PostgreSQL
+        db_type = 'postgresql'
+        db_config = DATABASE_URL
+    else:
+        # 没有配置 PostgreSQL，使用本地 SQLite（数据会丢失，不推荐）
+        db_type = 'sqlite'
+        db_config = '/tmp/portrait_app/codes.db'
+        os.makedirs('/tmp/portrait_app', exist_ok=True)
+else:
+    # 本地开发环境：使用 SQLite
+    db_type = 'sqlite'
+    db_config = 'codes.db'
+
+# 上传目录配置
+if is_railway:
+    # Railway 环境：使用临时目录（图片在重启后会丢失）
+    upload_folder = '/tmp/portrait_app/uploads'
 else:
     upload_folder = os.getenv('UPLOAD_FOLDER', 'uploads')
-    db_path = 'codes.db'
-
 os.makedirs(upload_folder, exist_ok=True)
+
+# PostgreSQL 支持
+if db_type == 'postgresql':
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        POSTGRES_AVAILABLE = True
+    except ImportError:
+        print("警告: psycopg2 未安装，将回退到 SQLite")
+        db_type = 'sqlite'
+        db_config = 'codes.db'
+        POSTGRES_AVAILABLE = False
+else:
+    POSTGRES_AVAILABLE = False
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = upload_folder
@@ -134,50 +166,117 @@ def check_rate_limit(ip, limit_type='general'):
     return True, None
 
 
+# ==================== 数据库连接辅助函数 ====================
+
+def get_db_connection():
+    """获取数据库连接（支持 PostgreSQL 和 SQLite）"""
+    if db_type == 'postgresql' and POSTGRES_AVAILABLE:
+        conn = psycopg2.connect(db_config)
+        conn.autocommit = False
+        return conn
+    else:
+        conn = sqlite3.connect(db_config)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+def get_db_cursor(conn):
+    """获取数据库游标（PostgreSQL 使用 RealDictCursor）"""
+    if db_type == 'postgresql' and POSTGRES_AVAILABLE:
+        return conn.cursor(cursor_factory=RealDictCursor)
+    else:
+        return conn.cursor()
+
+
 def init_db():
-    """初始化数据库"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    """初始化数据库（支持 PostgreSQL 和 SQLite）"""
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
 
-    # 验证码表
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS verification_codes (
-            code TEXT PRIMARY KEY,
-            max_uses INTEGER DEFAULT 3,
-            used_count INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status TEXT DEFAULT 'active'
-        )
-    ''')
+    try:
+        # 验证码表
+        if db_type == 'postgresql':
+            # PostgreSQL 语法
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS verification_codes (
+                    code TEXT PRIMARY KEY,
+                    max_uses INTEGER DEFAULT 3,
+                    used_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'active'
+                )
+            ''')
+        else:
+            # SQLite 语法
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS verification_codes (
+                    code TEXT PRIMARY KEY,
+                    max_uses INTEGER DEFAULT 3,
+                    used_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'active'
+                )
+            ''')
 
-    # 生成记录表（添加IP和更多安全信息）
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS generation_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            code TEXT,
-            style TEXT,
-            original_image TEXT,
-            result_image TEXT,
-            ip_address TEXT,
-            user_agent TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # 生成记录表
+        if db_type == 'postgresql':
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS generation_logs (
+                    id SERIAL PRIMARY KEY,
+                    code TEXT,
+                    style TEXT,
+                    original_image TEXT,
+                    result_image TEXT,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS generation_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT,
+                    style TEXT,
+                    original_image TEXT,
+                    result_image TEXT,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
-    # 验证尝试日志表（用于安全审计）
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS verification_attempts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            code TEXT,
-            ip_address TEXT,
-            success BOOLEAN,
-            failure_reason TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # 验证尝试日志表
+        if db_type == 'postgresql':
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS verification_attempts (
+                    id SERIAL PRIMARY KEY,
+                    code TEXT,
+                    ip_address TEXT,
+                    success BOOLEAN,
+                    failure_reason TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS verification_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT,
+                    ip_address TEXT,
+                    success BOOLEAN,
+                    failure_reason TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        print(f"[DB] 数据库初始化成功 (类型: {db_type})")
+    except Exception as e:
+        print(f"[DB] 数据库初始化失败: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 
 def allowed_file(filename):
@@ -187,8 +286,8 @@ def allowed_file(filename):
 
 def verify_code(code):
     """验证验证码并返回剩余次数"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
 
     c.execute('SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
     result = c.fetchone()
@@ -211,8 +310,8 @@ def verify_code(code):
 
 def use_code(code):
     """使用验证码（扣减次数）"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
     conn.commit()
     conn.close()
@@ -220,8 +319,8 @@ def use_code(code):
 
 def log_generation(code, style, original_image, result_image, ip_address=None, user_agent=None):
     """记录生成历史（包含IP和用户代理）"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('''
         INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -232,8 +331,8 @@ def log_generation(code, style, original_image, result_image, ip_address=None, u
 
 def log_verification_attempt(code, ip_address, success, failure_reason=None):
     """记录验证尝试（用于安全审计）"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('''
         INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
         VALUES (?, ?, ?, ?)
@@ -540,8 +639,8 @@ def status(code):
         return jsonify({'success': False, 'message': error}), 400
 
     # 获取生成历史
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('''
         SELECT style, created_at, result_image
         FROM generation_logs
@@ -593,9 +692,8 @@ def admin_logout():
 @admin_required
 def admin():
     """管理后台"""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
     codes = c.fetchall()
     conn.close()
@@ -610,8 +708,8 @@ def admin_generate_codes():
     count = data.get('count', 10)
     max_uses = data.get('max_uses', 3)
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
 
     codes = []
     for _ in range(count):
@@ -632,8 +730,8 @@ def admin_generate_codes():
 @admin_required
 def export_codes():
     """导出所有活跃验证码"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('SELECT code FROM verification_codes WHERE status = "active" ORDER BY code')
     codes = [row[0] for row in c.fetchall()]
     conn.close()
@@ -656,8 +754,8 @@ def export_codes():
 @admin_required
 def export_security_logs():
     """导出安全审计日志"""
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
     c.execute('''
         SELECT code, ip_address, success, failure_reason, created_at
         FROM verification_attempts
@@ -692,8 +790,8 @@ def batch_delete():
     if not codes:
         return jsonify({'success': False, 'message': '未选择验证码'}), 400
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
 
     # 使用占位符构建IN查询
     placeholders = ','.join(['?' for _ in codes])
@@ -720,8 +818,8 @@ def batch_update_status():
     if status not in ['active', 'inactive']:
         return jsonify({'success': False, 'message': '无效的状态'}), 400
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
 
     placeholders = ','.join(['?' for _ in codes])
     c.execute(f'UPDATE verification_codes SET status = ? WHERE code IN ({placeholders})', [status] + codes)
@@ -743,8 +841,8 @@ def reset_code():
     if not code:
         return jsonify({'success': False, 'message': '未指定验证码'}), 400
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_db_cursor(conn)
 
     c.execute('UPDATE verification_codes SET used_count = 0, status = "active" WHERE code = ?', (code,))
 
