@@ -456,6 +456,7 @@ def call_nanobanana_api(image_path, style, clothing, background):
     # ==================== 构建请求 payload ====================
     # 使用 JSON 格式的 prompt
     payload = {
+        "model": "gemini-3-pro-image-preview-2k",  # 指定模型
         "prompt": prompt_json,
         "image": image_data
     }
