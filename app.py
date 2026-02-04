@@ -461,14 +461,16 @@ def call_nanobanana_api(image_path, style, clothing, background):
                 last_api_call['error'] = None
 
                 # ========== 处理 Gemini API 响应格式 ==========
-                # Gemini 格式: {"candidates": [{"content": {"parts": [{"inline_data": {"data": "base64..."}}]}}]}
+                # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
                 if 'candidates' in result and len(result['candidates']) > 0:
                     candidate = result['candidates'][0]
                     if 'content' in candidate and 'parts' in candidate['content']:
                         for part in candidate['content']['parts']:
-                            if 'inline_data' in part and 'data' in part['inline_data']:
+                            # 检查 inlineData（驼峰命名）或 inline_data（下划线命名）
+                            inline_data = part.get('inlineData') or part.get('inline_data')
+                            if inline_data and 'data' in inline_data:
                                 import base64
-                                image_data = base64.b64decode(part['inline_data']['data'])
+                                image_data = base64.b64decode(inline_data['data'])
                                 result_path = image_path.replace('.', '_result.')
                                 with open(result_path, 'wb') as f:
                                     f.write(image_data)
