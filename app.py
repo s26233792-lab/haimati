@@ -77,7 +77,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
+# 使用 Gemini 3 Pro Image Preview 模型
+NANOBANANA_API_MODEL = os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview-2k')
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL',
+    f'https://cdn.12ai.org/v1beta/models/{NANOBANANA_API_MODEL}:generateContent')
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 
 # 管理后台认证配置
@@ -406,33 +409,61 @@ def call_nanobanana_api(image_path, style, clothing, background):
     with open(image_path, 'rb') as f:
         image_data = base64.b64encode(f.read()).decode()
 
-    # ==================== 构建最终 JSON payload ====================
+    # 获取图片 MIME 类型
+    import mimetypes
+    mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
+
+    # ==================== 构建完整 prompt (文本格式) ====================
+    prompt_text = f"""请将这张照片转换为美式专业职场风格的肖像照。
+
+要求：
+1. 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份
+2. 服装：{clothing if clothing != 'keep_original' else '和原图保持一致'}
+3. 背景：{background}色背景
+4. 风格：正面半身肖像，质感影棚背景，柔和自然光，背景略微虚化
+5. 体态：如军人般挺拔，强调宽肩，非正面（身体微侧，面部朝前）
+6. 画面尺寸：3:4
+
+请生成专业的肖像照。"""
+
+    # ==================== 构建 Gemini API payload ====================
     payload = {
-        "prompt": full_prompt,
-        "image": image_data
+        "contents": [{
+            "parts": [
+                {"text": prompt_text},
+                {
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": image_data
+                    }
+                }
+            ]
+        }]
     }
 
     # ==================== 打印 JSON 用于调试 ====================
-    print(f"[API Request] JSON Prompt:")
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(f"[API Request] Prompt:")
+    print(prompt_text)
+    print(f"[API Request] Target URL: {NANOBANANA_API_URL}")
     print("-" * 60)
 
     # ========== 真实 API 调用部分 ==========
     api_key = os.getenv('NANOBANANA_API_KEY', '')
-    api_url = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
+    api_url = NANOBANANA_API_URL
 
     # 检查 API Key 是否配置
     if api_key:
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
         print(f"[API] API URL: {api_url}")
         try:
-            print(f"[API] 开始调用 NanoBanana API...")
+            print(f"[API] 开始调用 Gemini API...")
+            # Gemini API 使用 URL 参数传递 key
+            request_url = f"{api_url}?key={api_key}"
             headers = {
-                'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json'
             }
 
-            response = requests.post(api_url, json=payload, headers=headers, timeout=120)
+            response = requests.post(request_url, json=payload, headers=headers, timeout=120)
 
             print(f"[API] 响应状态码: {response.status_code}")
 
@@ -445,13 +476,30 @@ def call_nanobanana_api(image_path, style, clothing, background):
             if response.status_code == 200:
                 result = response.json()
                 print(f"[API] 响应键: {list(result.keys())}")
-                print(f"[API] 响应内容预览: {json.dumps(result, ensure_ascii=False)[:300]}...")
+                print(f"[API] 响应内容预览: {json.dumps(result, ensure_ascii=False)[:400]}...")
 
                 # 保存响应信息
                 last_api_call['response_keys'] = list(result.keys())
                 last_api_call['error'] = None
 
-                # 处理不同格式的响应
+                # ========== 处理 Gemini API 响应格式 ==========
+                # Gemini 格式: {"candidates": [{"content": {"parts": [{"inline_data": {"data": "base64..."}}]}}]}
+                if 'candidates' in result and len(result['candidates']) > 0:
+                    candidate = result['candidates'][0]
+                    if 'content' in candidate and 'parts' in candidate['content']:
+                        for part in candidate['content']['parts']:
+                            if 'inline_data' in part and 'data' in part['inline_data']:
+                                import base64
+                                image_data = base64.b64decode(part['inline_data']['data'])
+                                result_path = image_path.replace('.', '_result.')
+                                with open(result_path, 'wb') as f:
+                                    f.write(image_data)
+                                print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
+                                last_api_call['success'] = True
+                                last_api_call['format'] = 'gemini'
+                                return result_path
+
+                # ========== 兼容其他格式 ==========
                 # 格式1: {"image": "base64_string"}
                 if 'image' in result:
                     import base64
@@ -478,18 +526,6 @@ def call_nanobanana_api(image_path, style, clothing, background):
                     else:
                         print(f"[API] 下载图片失败: {img_response.status_code}")
                         last_api_call['error'] = f'下载失败: {img_response.status_code}'
-
-                # 格式3: {"data": [{"b64_json": "..."}]}
-                elif 'data' in result and len(result['data']) > 0:
-                    import base64
-                    image_data = base64.b64decode(result['data'][0].get('b64_json', ''))
-                    result_path = image_path.replace('.', '_result.')
-                    with open(result_path, 'wb') as f:
-                        f.write(image_data)
-                    print(f"[API] ✓ 图片生成成功 (data格式): {result_path}")
-                    last_api_call['success'] = True
-                    last_api_call['format'] = 'data'
-                    return result_path
 
                 print(f"[API] ⚠ 未知响应格式，使用模拟模式")
                 last_api_call['error'] = '未知响应格式'
