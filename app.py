@@ -24,8 +24,21 @@ if sys.platform == 'win32':
 from dotenv import load_dotenv
 load_dotenv()
 
+# Railway 环境检测 - 使用 /tmp 目录存储数据
+is_railway = os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_VOLUME_PATH')
+if is_railway:
+    base_dir = '/tmp/portrait_app'
+    os.makedirs(base_dir, exist_ok=True)
+    upload_folder = os.path.join(base_dir, 'uploads')
+    db_path = os.path.join(base_dir, 'codes.db')
+else:
+    upload_folder = os.getenv('UPLOAD_FOLDER', 'uploads')
+    db_path = 'codes.db'
+
+os.makedirs(upload_folder, exist_ok=True)
+
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
+app.config['UPLOAD_FOLDER'] = upload_folder
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB max file size
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -123,7 +136,7 @@ def check_rate_limit(ip, limit_type='general'):
 
 def init_db():
     """初始化数据库"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     # 验证码表
@@ -174,7 +187,7 @@ def allowed_file(filename):
 
 def verify_code(code):
     """验证验证码并返回剩余次数"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     c.execute('SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
@@ -198,7 +211,7 @@ def verify_code(code):
 
 def use_code(code):
     """使用验证码（扣减次数）"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
     conn.commit()
@@ -207,7 +220,7 @@ def use_code(code):
 
 def log_generation(code, style, original_image, result_image, ip_address=None, user_agent=None):
     """记录生成历史（包含IP和用户代理）"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
         INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
@@ -219,7 +232,7 @@ def log_generation(code, style, original_image, result_image, ip_address=None, u
 
 def log_verification_attempt(code, ip_address, success, failure_reason=None):
     """记录验证尝试（用于安全审计）"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
         INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
@@ -488,7 +501,7 @@ def status(code):
         return jsonify({'success': False, 'message': error}), 400
 
     # 获取生成历史
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
         SELECT style, created_at, result_image
@@ -541,7 +554,7 @@ def admin_logout():
 @admin_required
 def admin():
     """管理后台"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
@@ -558,7 +571,7 @@ def admin_generate_codes():
     count = data.get('count', 10)
     max_uses = data.get('max_uses', 3)
 
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     codes = []
@@ -580,7 +593,7 @@ def admin_generate_codes():
 @admin_required
 def export_codes():
     """导出所有活跃验证码"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('SELECT code FROM verification_codes WHERE status = "active" ORDER BY code')
     codes = [row[0] for row in c.fetchall()]
@@ -604,7 +617,7 @@ def export_codes():
 @admin_required
 def export_security_logs():
     """导出安全审计日志"""
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
         SELECT code, ip_address, success, failure_reason, created_at
@@ -640,7 +653,7 @@ def batch_delete():
     if not codes:
         return jsonify({'success': False, 'message': '未选择验证码'}), 400
 
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     # 使用占位符构建IN查询
@@ -668,7 +681,7 @@ def batch_update_status():
     if status not in ['active', 'inactive']:
         return jsonify({'success': False, 'message': '无效的状态'}), 400
 
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     placeholders = ','.join(['?' for _ in codes])
@@ -691,7 +704,7 @@ def reset_code():
     if not code:
         return jsonify({'success': False, 'message': '未指定验证码'}), 400
 
-    conn = sqlite3.connect('codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     c.execute('UPDATE verification_codes SET used_count = 0, status = "active" WHERE code = ?', (code,))
@@ -708,8 +721,10 @@ def reset_code():
 
 # ==================== 启动 ====================
 
+# 初始化数据库（在任何环境下都执行）
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     print("🚀 肖像照生成服务启动成功!")
     print("📍 访问地址: http://localhost:5000")
     print("🔧 管理后台: http://localhost:5000/admin")
