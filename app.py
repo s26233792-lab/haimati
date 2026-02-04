@@ -453,8 +453,8 @@ def call_nanobanana_api(image_path, style, clothing, background):
     }
 
     # ==================== 打印 JSON 用于调试 ====================
-    print(f"[API Request] Prompt JSON:")
-    print(json.dumps(prompt_json, ensure_ascii=False, indent=2))
+    print(f"[API Request] Prompt:")
+    print(prompt_text)
     print(f"[API Request] Target URL: {NANOBANANA_API_URL}")
     print("-" * 60)
 
