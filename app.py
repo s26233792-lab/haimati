@@ -411,9 +411,12 @@ def call_nanobanana_api(image_path, style, clothing, background):
     api_key = os.getenv('NANOBANANA_API_KEY', '')
     api_url = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
 
+    # 检查 API Key 是否配置
     if api_key:
+        print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
+        print(f"[API] API URL: {api_url}")
         try:
-            print(f"[API] 调用 NanoBanana API: {api_url}")
+            print(f"[API] 开始调用 NanoBanana API...")
             headers = {
                 'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json'
@@ -425,7 +428,8 @@ def call_nanobanana_api(image_path, style, clothing, background):
 
             if response.status_code == 200:
                 result = response.json()
-                print(f"[API] 响应内容: {json.dumps(result, ensure_ascii=False)[:200]}...")
+                print(f"[API] 响应键: {list(result.keys())}")
+                print(f"[API] 响应内容预览: {json.dumps(result, ensure_ascii=False)[:300]}...")
 
                 # 处理不同格式的响应
                 # 格式1: {"image": "base64_string"}
@@ -435,7 +439,7 @@ def call_nanobanana_api(image_path, style, clothing, background):
                     result_path = image_path.replace('.', '_result.')
                     with open(result_path, 'wb') as f:
                         f.write(image_data)
-                    print(f"[API] 图片生成成功: {result_path}")
+                    print(f"[API] ✓ 图片生成成功 (base64格式): {result_path}")
                     return result_path
 
                 # 格式2: {"url": "https://..."}
@@ -445,8 +449,10 @@ def call_nanobanana_api(image_path, style, clothing, background):
                         result_path = image_path.replace('.', '_result.')
                         with open(result_path, 'wb') as f:
                             f.write(img_response.content)
-                        print(f"[API] 图片下载成功: {result_path}")
+                        print(f"[API] ✓ 图片下载成功 (URL格式): {result_path}")
                         return result_path
+                    else:
+                        print(f"[API] 下载图片失败: {img_response.status_code}")
 
                 # 格式3: {"data": [{"b64_json": "..."}]}
                 elif 'data' in result and len(result['data']) > 0:
@@ -455,17 +461,22 @@ def call_nanobanana_api(image_path, style, clothing, background):
                     result_path = image_path.replace('.', '_result.')
                     with open(result_path, 'wb') as f:
                         f.write(image_data)
-                    print(f"[API] 图片生成成功: {result_path}")
+                    print(f"[API] ✓ 图片生成成功 (data格式): {result_path}")
                     return result_path
 
-                print(f"[API] 未知响应格式，使用模拟模式")
+                print(f"[API] ⚠ 未知响应格式，使用模拟模式")
             else:
-                print(f"[API] API 调用失败: {response.status_code}")
-                print(f"[API] 错误内容: {response.text[:200]}")
+                print(f"[API] ✗ API 调用失败: {response.status_code}")
+                print(f"[API] 错误内容: {response.text[:500]}")
 
         except Exception as e:
-            print(f"[API] API 调用异常: {e}")
+            print(f"[API] ✗ API 调用异常: {type(e).__name__}: {e}")
+            import traceback
+            print(f"[API] 异常堆栈: {traceback.format_exc()}")
             print(f"[API] 将使用模拟模式")
+    else:
+        print(f"[API] ⚠ API Key 未配置，使用模拟模式")
+        print(f"[API] 提示: 请在 Railway Variables 中设置 NANOBANANA_API_KEY")
 
     # ========== 模拟模式：对图片进行简单处理 ==========
     # 服装名称映射 (用于显示)
