@@ -197,7 +197,11 @@ async function generatePortrait() {
 
             // 显示结果
             resultImage.src = data.result_url;
+
+            // 设置下载链接（使用时间戳作为文件名）
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
             downloadLink.href = data.result_url;
+            downloadLink.download = `portrait-${timestamp}.png`;
 
             step2.style.display = 'none';
             step3.style.display = 'block';
