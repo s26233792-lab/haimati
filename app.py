@@ -642,6 +642,21 @@ def result(filename):
     return "图片不存在", 404
 
 
+@app.route('/debug/config')
+def debug_config():
+    """调试端点 - 检查配置（仅供调试使用）"""
+    api_key = os.getenv('NANOBANANA_API_KEY', '')
+    return jsonify({
+        'api_key_configured': bool(api_key),
+        'api_key_length': len(api_key) if api_key else 0,
+        'api_key_prefix': api_key[:10] + '...' if api_key else None,
+        'api_url': os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits'),
+        'db_type': db_type,
+        'postgres_available': POSTGRES_AVAILABLE,
+        'is_railway': is_railway
+    })
+
+
 @app.route('/api/status/<code>')
 def status(code):
     """获取验证码状态"""
