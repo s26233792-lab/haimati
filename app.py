@@ -309,25 +309,64 @@ def call_nanobanana_api(image_path, style, clothing, background):
     print("-" * 60)
 
     # ========== 真实 API 调用部分 ==========
-    # 当有真实 API Key 时，取消注释以下代码
-    """
     api_key = os.getenv('NANOBANANA_API_KEY', '')
-    api_url = os.getenv('NANOBANANA_API_URL', '')
+    api_url = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
 
-    if api_key and api_url:
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
+    if api_key:
+        try:
+            print(f"[API] 调用 NanoBanana API: {api_url}")
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
 
-        response = requests.post(api_url, json=payload, headers=headers, timeout=120)
+            response = requests.post(api_url, json=payload, headers=headers, timeout=120)
 
-        if response.status_code == 200:
-            # 解析响应并保存生成的图片
-            result = response.json()
-            # ... 保存图片逻辑
-            return result_path
-    """
+            print(f"[API] 响应状态码: {response.status_code}")
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"[API] 响应内容: {json.dumps(result, ensure_ascii=False)[:200]}...")
+
+                # 处理不同格式的响应
+                # 格式1: {"image": "base64_string"}
+                if 'image' in result:
+                    import base64
+                    image_data = base64.b64decode(result['image'])
+                    result_path = image_path.replace('.', '_result.')
+                    with open(result_path, 'wb') as f:
+                        f.write(image_data)
+                    print(f"[API] 图片生成成功: {result_path}")
+                    return result_path
+
+                # 格式2: {"url": "https://..."}
+                elif 'url' in result:
+                    img_response = requests.get(result['url'], timeout=30)
+                    if img_response.status_code == 200:
+                        result_path = image_path.replace('.', '_result.')
+                        with open(result_path, 'wb') as f:
+                            f.write(img_response.content)
+                        print(f"[API] 图片下载成功: {result_path}")
+                        return result_path
+
+                # 格式3: {"data": [{"b64_json": "..."}]}
+                elif 'data' in result and len(result['data']) > 0:
+                    import base64
+                    image_data = base64.b64decode(result['data'][0].get('b64_json', ''))
+                    result_path = image_path.replace('.', '_result.')
+                    with open(result_path, 'wb') as f:
+                        f.write(image_data)
+                    print(f"[API] 图片生成成功: {result_path}")
+                    return result_path
+
+                print(f"[API] 未知响应格式，使用模拟模式")
+            else:
+                print(f"[API] API 调用失败: {response.status_code}")
+                print(f"[API] 错误内容: {response.text[:200]}")
+
+        except Exception as e:
+            print(f"[API] API 调用异常: {e}")
+            print(f"[API] 将使用模拟模式")
 
     # ========== 模拟模式：对图片进行简单处理 ==========
     # 服装名称映射 (用于显示)
