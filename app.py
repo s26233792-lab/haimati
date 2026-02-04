@@ -354,64 +354,21 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
 
 def call_nanobanana_api(image_path, style, clothing, background):
     """
-    调用图片生成 API
+    调用图片生成 API (12ai.org NanoBanana Pro)
 
     参数:
         style: 风格 (portrait)
         clothing: 服装 (business_suit, formal_dress, casual_shirt, turtleneck, tshirt)
         background: 背景 (gray, white, blue, warm)
-
-    注意：当前使用模拟模式，对图片进行处理。
-    要启用真实 API 生成，请配置支持图片生成的 API Key。
     """
     import base64
-    from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
-    import os
-
-    # ==================== 基本关键词结构 ====================
-    base_prompt = {
-        "主体转换任务": {
-            "目标风格": "美式专业职场风格",
-            "肖像类型": "正面半身肖像"
-        },
-        "人物特征保留": {
-            "五官": "100%还原原始五官特征",
-            "发型": "保留原始发型",
-            "身份一致性": "严格保持原始身份"
-        },
-        "视觉与构图": {
-            "背景环境": "质感影棚背景，柔和自然光，背景略微虚化",
-            "画质细节": "清晰对焦，肤色真实自然，构图干净优雅",
-            "镜头语言": "微微倾斜镜头"
-        },
-        "姿态动作": {
-            "体态": "如军人般挺拔，强调宽肩",
-            "角度": "非正面（身体微侧，面部朝前）"
-        },
-        "画面尺寸": "3:4"
-    }
-
-    # ==================== 构建完整 prompt ====================
-    # 服装和背景直接使用用户选择的值，不做转换
-    full_prompt = base_prompt.copy()
-
-    # 服装处理：如果选择"和原图保持一致"，使用特殊标记
-    if clothing == 'keep_original':
-        full_prompt["服装"] = "和原图保持一致"
-    else:
-        full_prompt["服装"] = clothing
-
-    full_prompt["背景"] = background
+    from PIL import Image, ImageFilter, ImageEnhance
 
     # ==================== 读取并编码图片 ====================
     with open(image_path, 'rb') as f:
         image_data = base64.b64encode(f.read()).decode()
 
-    # 获取图片 MIME 类型
-    import mimetypes
-    mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
-
-    # ==================== 构建完整 prompt (文本格式) ====================
+    # ==================== 构建文本 prompt ====================
     # 服装处理
     clothing_map = {
         'business_suit': '商务西装',
