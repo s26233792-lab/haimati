@@ -77,8 +77,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
-# 12ai.org 代理的 NanoBanana Pro API
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
+# 12ai.org 代理的 Gemini 图片生成 API
+NANOBANANA_API_MODEL = os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview')
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL',
+    f'https://cdn.12ai.org/v1beta/models/{NANOBANANA_API_MODEL}:generateContent')
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 
 # 管理后台认证配置
@@ -402,11 +404,19 @@ def call_nanobanana_api(image_path, style, clothing, background):
 
 画面尺寸：3:4"""
 
-    # ==================== 构建请求 payload ====================
+    # ==================== 构建请求 payload (Gemini 格式) ====================
     payload = {
-        "model": "gemini-3-pro-image-preview",  # 指定模型
-        "prompt": prompt_text,  # prompt 为文本格式
-        "image": image_data
+        "contents": [{
+            "parts": [
+                {"text": prompt_text},
+                {
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": image_data
+                    }
+                }
+            ]
+        }]
     }
 
     # ==================== 打印 JSON 用于调试 ====================
@@ -424,14 +434,14 @@ def call_nanobanana_api(image_path, style, clothing, background):
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
         print(f"[API] API URL: {api_url}")
         try:
-            print(f"[API] 开始调用 NanoBanana Pro API...")
-            # 使用 Authorization header
+            print(f"[API] 开始调用 Gemini API...")
+            # Gemini API 使用 URL 参数传递 key
+            request_url = f"{api_url}?key={api_key}"
             headers = {
-                'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json'
             }
 
-            response = requests.post(api_url, json=payload, headers=headers, timeout=120)
+            response = requests.post(request_url, json=payload, headers=headers, timeout=120)
 
             print(f"[API] 响应状态码: {response.status_code}")
 
