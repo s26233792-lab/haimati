@@ -77,10 +77,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
-# 使用 Gemini 3 Pro Image Preview 模型
-NANOBANANA_API_MODEL = os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview-2k')
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL',
-    f'https://cdn.12ai.org/v1beta/models/{NANOBANANA_API_MODEL}:generateContent')
+# 12ai.org 代理的 NanoBanana Pro API
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 
 # 管理后台认证配置
@@ -413,37 +411,58 @@ def call_nanobanana_api(image_path, style, clothing, background):
     import mimetypes
     mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
 
-    # ==================== 构建完整 prompt (文本格式) ====================
-    prompt_text = f"""请将这张照片转换为美式专业职场风格的肖像照。
+    # ==================== 构建完整 prompt (JSON 格式) ====================
+    # 服装处理
+    clothing_map = {
+        'business_suit': '商务西装',
+        'formal_dress': '正装礼服',
+        'casual_shirt': '休闲衬衫',
+        'turtleneck': '高领毛衣',
+        'tshirt': '简约T恤',
+        'keep_original': '和原图保持一致'
+    }
 
-要求：
-1. 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份
-2. 服装：{clothing if clothing != 'keep_original' else '和原图保持一致'}
-3. 背景：{background}色背景
-4. 风格：正面半身肖像，质感影棚背景，柔和自然光，背景略微虚化
-5. 体态：如军人般挺拔，强调宽肩，非正面（身体微侧，面部朝前）
-6. 画面尺寸：3:4
+    # 背景处理
+    background_map = {
+        'gray': '灰色',
+        'white': '白色',
+        'blue': '蓝色',
+        'warm': '暖色'
+    }
 
-请生成专业的肖像照。"""
+    prompt_json = {
+        "主体转换任务": {
+            "目标风格": "美式专业职场风格",
+            "肖像类型": "正面半身肖像"
+        },
+        "人物特征保留": {
+            "五官": "100%还原原始五官特征",
+            "发型": "保留原始发型",
+            "身份一致性": "严格保持原始身份"
+        },
+        "视觉与构图": {
+            "背景环境": f"质感影棚背景，柔和自然光，背景略微虚化，{background_map.get(background, '灰色')}色背景",
+            "画质细节": "清晰对焦，肤色真实自然，构图干净优雅",
+            "镜头语言": "微微倾斜镜头"
+        },
+        "姿态动作": {
+            "体态": "如军人般挺拔，强调宽肩",
+            "角度": "非正面（身体微侧，面部朝前）"
+        },
+        "服装": clothing_map.get(clothing, '商务西装'),
+        "画面尺寸": "3:4"
+    }
 
-    # ==================== 构建 Gemini API payload ====================
+    # ==================== 构建请求 payload ====================
+    # 使用 JSON 格式的 prompt
     payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt_text},
-                {
-                    "inline_data": {
-                        "mime_type": mime_type,
-                        "data": image_data
-                    }
-                }
-            ]
-        }]
+        "prompt": prompt_json,
+        "image": image_data
     }
 
     # ==================== 打印 JSON 用于调试 ====================
-    print(f"[API Request] Prompt:")
-    print(prompt_text)
+    print(f"[API Request] Prompt JSON:")
+    print(json.dumps(prompt_json, ensure_ascii=False, indent=2))
     print(f"[API Request] Target URL: {NANOBANANA_API_URL}")
     print("-" * 60)
 
@@ -456,14 +475,14 @@ def call_nanobanana_api(image_path, style, clothing, background):
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
         print(f"[API] API URL: {api_url}")
         try:
-            print(f"[API] 开始调用 Gemini API...")
-            # Gemini API 使用 URL 参数传递 key
-            request_url = f"{api_url}?key={api_key}"
+            print(f"[API] 开始调用 NanoBanana Pro API...")
+            # 使用 Authorization header
             headers = {
+                'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json'
             }
 
-            response = requests.post(request_url, json=payload, headers=headers, timeout=120)
+            response = requests.post(api_url, json=payload, headers=headers, timeout=120)
 
             print(f"[API] 响应状态码: {response.status_code}")
 
