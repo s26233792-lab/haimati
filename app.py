@@ -416,7 +416,13 @@ def call_nanobanana_api(image_path, style, clothing, background):
                     }
                 }
             ]
-        }]
+        }],
+        "generationConfig": {
+            "temperature": 0.4,
+            "topK": 32,
+            "topP": 0.95,
+            "candidateCount": 1
+        }
     }
 
     # ==================== 打印 JSON 用于调试 ====================
