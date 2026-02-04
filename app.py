@@ -117,6 +117,16 @@ RATE_LIMIT_CONFIG = {
 request_tracker = {}  # {ip: {'count': int, 'reset_time': timestamp, 'blocked_until': timestamp}}
 verify_attempts = {}  # {ip: {'count': int, 'reset_time': timestamp}}
 
+# API 调用调试信息
+last_api_call = {
+    'called': False,
+    'url': '',
+    'status_code': None,
+    'response_keys': [],
+    'error': None,
+    'timestamp': None
+}
+
 
 def get_client_ip():
     """获取客户端真实IP"""
@@ -426,10 +436,20 @@ def call_nanobanana_api(image_path, style, clothing, background):
 
             print(f"[API] 响应状态码: {response.status_code}")
 
+            # 保存调试信息
+            last_api_call['called'] = True
+            last_api_call['url'] = api_url
+            last_api_call['status_code'] = response.status_code
+            last_api_call['timestamp'] = datetime.now().isoformat()
+
             if response.status_code == 200:
                 result = response.json()
                 print(f"[API] 响应键: {list(result.keys())}")
                 print(f"[API] 响应内容预览: {json.dumps(result, ensure_ascii=False)[:300]}...")
+
+                # 保存响应信息
+                last_api_call['response_keys'] = list(result.keys())
+                last_api_call['error'] = None
 
                 # 处理不同格式的响应
                 # 格式1: {"image": "base64_string"}
@@ -440,6 +460,8 @@ def call_nanobanana_api(image_path, style, clothing, background):
                     with open(result_path, 'wb') as f:
                         f.write(image_data)
                     print(f"[API] ✓ 图片生成成功 (base64格式): {result_path}")
+                    last_api_call['success'] = True
+                    last_api_call['format'] = 'base64'
                     return result_path
 
                 # 格式2: {"url": "https://..."}
@@ -450,9 +472,12 @@ def call_nanobanana_api(image_path, style, clothing, background):
                         with open(result_path, 'wb') as f:
                             f.write(img_response.content)
                         print(f"[API] ✓ 图片下载成功 (URL格式): {result_path}")
+                        last_api_call['success'] = True
+                        last_api_call['format'] = 'url'
                         return result_path
                     else:
                         print(f"[API] 下载图片失败: {img_response.status_code}")
+                        last_api_call['error'] = f'下载失败: {img_response.status_code}'
 
                 # 格式3: {"data": [{"b64_json": "..."}]}
                 elif 'data' in result and len(result['data']) > 0:
@@ -462,21 +487,27 @@ def call_nanobanana_api(image_path, style, clothing, background):
                     with open(result_path, 'wb') as f:
                         f.write(image_data)
                     print(f"[API] ✓ 图片生成成功 (data格式): {result_path}")
+                    last_api_call['success'] = True
+                    last_api_call['format'] = 'data'
                     return result_path
 
                 print(f"[API] ⚠ 未知响应格式，使用模拟模式")
+                last_api_call['error'] = '未知响应格式'
             else:
                 print(f"[API] ✗ API 调用失败: {response.status_code}")
                 print(f"[API] 错误内容: {response.text[:500]}")
+                last_api_call['error'] = f'状态码: {response.status_code}, 内容: {response.text[:200]}'
 
         except Exception as e:
             print(f"[API] ✗ API 调用异常: {type(e).__name__}: {e}")
             import traceback
             print(f"[API] 异常堆栈: {traceback.format_exc()}")
             print(f"[API] 将使用模拟模式")
+            last_api_call['error'] = f'{type(e).__name__}: {str(e)}'
     else:
         print(f"[API] ⚠ API Key 未配置，使用模拟模式")
         print(f"[API] 提示: 请在 Railway Variables 中设置 NANOBANANA_API_KEY")
+        last_api_call['error'] = 'API Key 未配置'
 
     # ========== 模拟模式：对图片进行简单处理 ==========
     # 服装名称映射 (用于显示)
@@ -655,6 +686,12 @@ def debug_config():
         'postgres_available': POSTGRES_AVAILABLE,
         'is_railway': is_railway
     })
+
+
+@app.route('/debug/api')
+def debug_api():
+    """调试端点 - 查看最后一次 API 调用信息"""
+    return jsonify(last_api_call)
 
 
 @app.route('/api/status/<code>')
