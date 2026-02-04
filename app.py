@@ -1,0 +1,717 @@
+"""
+肖像照生成网站 - 后端主文件
+功能：验证码验证、图片上传、API调用、使用次数管理
+"""
+
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
+from werkzeug.utils import secure_filename
+import sqlite3
+import os
+import random
+import string
+import requests
+from datetime import datetime, timedelta
+import json
+import sys
+import time
+
+# Windows 控制台编码修复
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# 加载环境变量
+from dotenv import load_dotenv
+load_dotenv()
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB max file size
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# NanoBanana API 配置
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', 'https://cdn.12ai.org/v1/images/edits')
+NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
+
+# 管理后台认证配置
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+
+from functools import wraps
+
+
+def admin_required(f):
+    """管理后台身份验证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 检查 session 中是否有登录标记
+        if not session.get('admin_logged_in'):
+            # 如果是 API 请求，返回 401
+            if request.path.startswith('/admin/') and request.path != '/admin':
+                return jsonify({'success': False, 'message': '请先登录'}), 401
+            # 否则重定向到登录页
+            return redirect('/admin/login')
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ==================== 数据库初始化 ====================
+
+# ==================== 安全配��� ====================
+# 请求频率限制配置
+RATE_LIMIT_CONFIG = {
+    'max_requests_per_minute': 10,  # 每分钟最多10次请求
+    'max_verify_attempts_per_hour': 5,  # 每小时最多5次验证尝试
+    'block_duration_minutes': 30  # 违规后封禁时长（分钟）
+}
+
+# 内存存储的请求记录（生产环境建议使用Redis）
+request_tracker = {}  # {ip: {'count': int, 'reset_time': timestamp, 'blocked_until': timestamp}}
+verify_attempts = {}  # {ip: {'count': int, 'reset_time': timestamp}}
+
+
+def get_client_ip():
+    """获取客户端真实IP"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    return request.remote_addr
+
+
+def check_rate_limit(ip, limit_type='general'):
+    """检查请求频率限制"""
+    now = time.time()
+
+    # ��查是否被封禁
+    if ip in request_tracker and request_tracker[ip].get('blocked_until', 0) > now:
+        return False, f"请求过于频繁，请在 {int((request_tracker[ip]['blocked_until'] - now) / 60)} 分钟后重试"
+
+    # 检查频率限制
+    if limit_type == 'verify':
+        # 验证码验证限制
+        if ip not in verify_attempts:
+            verify_attempts[ip] = {'count': 0, 'reset_time': now + 3600}
+
+        if verify_attempts[ip]['reset_time'] < now:
+            verify_attempts[ip] = {'count': 0, 'reset_time': now + 3600}
+
+        if verify_attempts[ip]['count'] >= RATE_LIMIT_CONFIG['max_verify_attempts_per_hour']:
+            return False, "验证尝试次数过多，请稍后再试"
+
+        verify_attempts[ip]['count'] += 1
+    else:
+        # 通用请求限制
+        if ip not in request_tracker:
+            request_tracker[ip] = {'count': 0, 'reset_time': now + 60, 'blocked_until': 0}
+
+        if request_tracker[ip]['reset_time'] < now:
+            request_tracker[ip] = {'count': 0, 'reset_time': now + 60, 'blocked_until': 0}
+
+        if request_tracker[ip]['count'] >= RATE_LIMIT_CONFIG['max_requests_per_minute']:
+            # 封禁该IP
+            request_tracker[ip]['blocked_until'] = now + (RATE_LIMIT_CONFIG['block_duration_minutes'] * 60)
+            return False, f"请求过于频繁，已被临时限制访问 {RATE_LIMIT_CONFIG['block_duration_minutes']} 分钟"
+
+        request_tracker[ip]['count'] += 1
+
+    return True, None
+
+
+def init_db():
+    """初始化数据库"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+
+    # 验证码表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS verification_codes (
+            code TEXT PRIMARY KEY,
+            max_uses INTEGER DEFAULT 3,
+            used_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'active'
+        )
+    ''')
+
+    # 生成记录表（添加IP和更多安全信息）
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS generation_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT,
+            style TEXT,
+            original_image TEXT,
+            result_image TEXT,
+            ip_address TEXT,
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 验证尝试日志表（用于安全审计）
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS verification_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT,
+            ip_address TEXT,
+            success BOOLEAN,
+            failure_reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+
+def allowed_file(filename):
+    """检查文件类型是否允许"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def verify_code(code):
+    """验证验证码并返回剩余次数"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+
+    c.execute('SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
+    result = c.fetchone()
+    conn.close()
+
+    if not result:
+        return None, "验证码不存在"
+
+    max_uses, used_count, status = result
+
+    if status != 'active':
+        return None, "验证码已失效"
+
+    remaining = max_uses - used_count
+    if remaining <= 0:
+        return None, "验证码使用次数已用完"
+
+    return {'max_uses': max_uses, 'used_count': used_count, 'remaining': remaining}, None
+
+
+def use_code(code):
+    """使用验证码（扣减次数）"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+    c.execute('UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
+    conn.commit()
+    conn.close()
+
+
+def log_generation(code, style, original_image, result_image, ip_address=None, user_agent=None):
+    """记录生成历史（包含IP和用户代理）"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (code, style, original_image, result_image, ip_address, user_agent))
+    conn.commit()
+    conn.close()
+
+
+def log_verification_attempt(code, ip_address, success, failure_reason=None):
+    """记录验证尝试（用于安全审计）"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
+        VALUES (?, ?, ?, ?)
+    ''', (code, ip_address, success, failure_reason))
+    conn.commit()
+    conn.close()
+
+
+def call_nanobanana_api(image_path, style, clothing, background):
+    """
+    调用图片生成 API
+
+    参数:
+        style: 风格 (portrait)
+        clothing: 服装 (business_suit, formal_dress, casual_shirt, turtleneck, tshirt)
+        background: 背景 (gray, white, blue, warm)
+
+    注意：当前使用模拟模式，对图片进行处理。
+    要启用真实 API 生成，请配置支持图片生成的 API Key。
+    """
+    import base64
+    from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
+    import os
+
+    # ==================== 基本关键词结构 ====================
+    base_prompt = {
+        "主体转换任务": {
+            "目标风格": "美式专业职场风格",
+            "肖像类型": "正面半身肖像"
+        },
+        "人物特征保留": {
+            "五官": "100%还原原始五官特征",
+            "发型": "保留原始发型",
+            "身份一致性": "严格保持原始身份"
+        },
+        "视觉与构图": {
+            "背景环境": "质感影棚背景，柔和自然光，背景略微虚化",
+            "画质细节": "清晰对焦，肤色真实自然，构图干净优雅",
+            "镜头语言": "微微倾斜镜头"
+        },
+        "姿态动作": {
+            "体态": "如军人般挺拔，强调宽肩",
+            "角度": "非正面（身体微侧，面部朝前）"
+        },
+        "画面尺寸": "3:4"
+    }
+
+    # ==================== 构建完整 prompt ====================
+    # 服装和背景直接使用用户选择的值，不做转换
+    full_prompt = base_prompt.copy()
+
+    # 服装处理：如果选择"和原图保持一致"，使用特殊标记
+    if clothing == 'keep_original':
+        full_prompt["服装"] = "和原图保持一致"
+    else:
+        full_prompt["服装"] = clothing
+
+    full_prompt["背景"] = background
+
+    # ==================== 读取并编码图片 ====================
+    with open(image_path, 'rb') as f:
+        image_data = base64.b64encode(f.read()).decode()
+
+    # ==================== 构建最终 JSON payload ====================
+    payload = {
+        "prompt": full_prompt,
+        "image": image_data
+    }
+
+    # ==================== 打印 JSON 用于调试 ====================
+    print(f"[API Request] JSON Prompt:")
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print("-" * 60)
+
+    # ========== 真实 API 调用部分 ==========
+    # 当有真实 API Key 时，取消注释以下代码
+    """
+    api_key = os.getenv('NANOBANANA_API_KEY', '')
+    api_url = os.getenv('NANOBANANA_API_URL', '')
+
+    if api_key and api_url:
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.post(api_url, json=payload, headers=headers, timeout=120)
+
+        if response.status_code == 200:
+            # 解析响应并保存生成的图片
+            result = response.json()
+            # ... 保存图片逻辑
+            return result_path
+    """
+
+    # ========== 模拟模式：对图片进行简单处理 ==========
+    # 服装名称映射 (用于显示)
+    clothing_names = {
+        'business_suit': '商务西装',
+        'formal_dress': '正装礼服',
+        'casual_shirt': '休闲衬衫',
+        'turtleneck': '高领毛衣',
+        'tshirt': '简约T恤'
+    }
+
+    # 背景颜色映射 (用于模拟模式)
+    background_colors = {
+        'gray': (128, 128, 128),
+        'white': (245, 245, 245),
+        'blue': (102, 126, 234),
+        'warm': (245, 147, 251)
+    }
+
+    try:
+        # 打开原始图片
+        img = Image.open(image_path)
+        img = img.convert('RGBA')
+
+        # 创建带背景的新图片
+        bg_color = background_colors.get(background, (128, 128, 128))
+        background_img = Image.new('RGBA', img.size, bg_color + (255,))
+        background_img.paste(img, (0, 0), img)
+        img = background_img.convert('RGB')
+
+        # 美式肖像风格处理
+        enhancer = ImageEnhance.Color(img)
+        img = enhancer.enhance(0.85)
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(1.2)
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(1.05)
+        img = img.filter(ImageFilter.SMOOTH)
+
+        # 保存处理后的图片
+        result_path = image_path.replace('.', '_result.')
+        img.save(result_path, quality=95)
+
+        print(f"[模拟模式] 图片已处理: {result_path}")
+        print(f"  风格: {style}, 服装: {clothing}, 背景: {background}")
+
+        return result_path
+
+    except Exception as e:
+        print(f"图片处理失败: {e}")
+        return image_path  # 失败时返回原图
+
+
+# ==================== 路由 ====================
+
+@app.route('/')
+def index():
+    """首页"""
+    return render_template('index.html')
+
+
+@app.route('/api/verify', methods=['POST'])
+def verify():
+    """验证验证码（带安全检查）"""
+    # 获取客户端IP
+    client_ip = get_client_ip()
+
+    # 检查频率限制
+    allowed, error_msg = check_rate_limit(client_ip, 'verify')
+    if not allowed:
+        log_verification_attempt('', client_ip, False, f'频率限制: {error_msg}')
+        return jsonify({'success': False, 'message': error_msg}), 429
+
+    data = request.json
+    code = data.get('code', '').strip()
+
+    if not code:
+        log_verification_attempt('', client_ip, False, '请输入验证码')
+        return jsonify({'success': False, 'message': '请输入验证码'}), 400
+
+    result, error = verify_code(code)
+
+    if error:
+        log_verification_attempt(code, client_ip, False, error)
+        return jsonify({'success': False, 'message': error}), 400
+
+    # 记录成功的验证尝试
+    log_verification_attempt(code, client_ip, True)
+
+    return jsonify({
+        'success': True,
+        'remaining': result['remaining'],
+        'max_uses': result['max_uses']
+    })
+
+
+@app.route('/api/upload', methods=['POST'])
+def upload():
+    """上传图片并生成（带安全检查）"""
+    # 获取客户端信息
+    client_ip = get_client_ip()
+    user_agent = request.headers.get('User-Agent', '')
+
+    # 检查频率限制
+    allowed, error_msg = check_rate_limit(client_ip)
+    if not allowed:
+        return jsonify({'success': False, 'message': error_msg}), 429
+
+    code = request.form.get('code', '').strip()
+    style = request.form.get('style', 'portrait')
+    clothing = request.form.get('clothing', 'business_suit')
+    background = request.form.get('background', 'gray')
+
+    # 验证验证码
+    result, error = verify_code(code)
+    if error:
+        return jsonify({'success': False, 'message': error}), 400
+
+    # 检查文件
+    if 'image' not in request.files:
+        return jsonify({'success': False, 'message': '请上传图片'}), 400
+
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '请选择图片'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'success': False, 'message': '只支持 PNG、JPG、JPEG、WEBP 格式'}), 400
+
+    # 保存上传的文件
+    filename = secure_filename(file.filename)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"{timestamp}_{filename}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    # 调用 API 生成图片
+    try:
+        result_path = call_nanobanana_api(filepath, style, clothing, background)
+
+        # 扣减使用次数
+        use_code(code)
+
+        # 记录日志（包含IP和用户代理）
+        log_generation(code, f"{style}_{clothing}_{background}", filename, result_path, client_ip, user_agent)
+
+        return jsonify({
+            'success': True,
+            'result_url': f'/result/{result_path.split("/")[-1]}',
+            'remaining': result['remaining'] - 1
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'生成失败: {str(e)}'}), 500
+
+
+@app.route('/result/<filename>')
+def result(filename):
+    """返回生成的图片"""
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    return "图片不存在", 404
+
+
+@app.route('/api/status/<code>')
+def status(code):
+    """获取验证码状态"""
+    result, error = verify_code(code)
+    if error:
+        return jsonify({'success': False, 'message': error}), 400
+
+    # 获取生成历史
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT style, created_at, result_image
+        FROM generation_logs
+        WHERE code = ?
+        ORDER BY created_at DESC
+    ''', (code,))
+    logs = c.fetchall()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'remaining': result['remaining'],
+        'max_uses': result['max_uses'],
+        'history': [{'style': row[0], 'time': row[1], 'result': row[2]} for row in logs]
+    })
+
+
+# ==================== 管理后台路由 ====================
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    """管理后台登录"""
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            session.permanent = False  # 浏览器关闭后过期
+            return redirect(url_for('admin'))
+        else:
+            return render_template('admin_login.html', error='用户名或密码错误')
+
+    # 如果已登录，直接跳转到管理后台
+    if session.get('admin_logged_in'):
+        return redirect(url_for('admin'))
+
+    return render_template('admin_login.html')
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    """管理后台登出"""
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
+
+@app.route('/admin')
+@admin_required
+def admin():
+    """管理后台"""
+    conn = sqlite3.connect('codes.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
+    codes = c.fetchall()
+    conn.close()
+    return render_template('admin.html', codes=codes)
+
+
+@app.route('/admin/generate_codes', methods=['POST'])
+@admin_required
+def admin_generate_codes():
+    """批量生成验证码"""
+    data = request.json
+    count = data.get('count', 10)
+    max_uses = data.get('max_uses', 3)
+
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+
+    codes = []
+    for _ in range(count):
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        try:
+            c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
+            codes.append(code)
+        except sqlite3.IntegrityError:
+            continue
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'codes': codes, 'count': len(codes)})
+
+
+@app.route('/admin/export_codes')
+@admin_required
+def export_codes():
+    """导出所有活跃验证码"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+    c.execute('SELECT code FROM verification_codes WHERE status = "active" ORDER BY code')
+    codes = [row[0] for row in c.fetchall()]
+    conn.close()
+
+    # 返回文本文件
+    import io
+    output = io.StringIO()
+    for code in codes:
+        output.write(f"{code}\n")
+
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype='text/plain',
+        headers={'Content-Disposition': 'attachment; filename=verification_codes.txt'}
+    )
+
+
+@app.route('/admin/export_security_logs')
+@admin_required
+def export_security_logs():
+    """导出安全审计日志"""
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT code, ip_address, success, failure_reason, created_at
+        FROM verification_attempts
+        ORDER BY created_at DESC
+        LIMIT 1000
+    ''')
+    logs = c.fetchall()
+    conn.close()
+
+    # 返回CSV文件
+    import io
+    output = io.StringIO()
+    output.write("验证码,IP地址,是否成功,失败原因,时间\n")
+    for log in logs:
+        output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
+
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=security_logs.csv'}
+    )
+
+
+@app.route('/admin/batch_delete', methods=['POST'])
+@admin_required
+def batch_delete():
+    """批量删除验证码"""
+    data = request.json
+    codes = data.get('codes', [])
+
+    if not codes:
+        return jsonify({'success': False, 'message': '未选择验证码'}), 400
+
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+
+    # 使用占位符构建IN查询
+    placeholders = ','.join(['?' for _ in codes])
+    c.execute(f'DELETE FROM verification_codes WHERE code IN ({placeholders})', codes)
+
+    deleted = c.rowcount
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'deleted': deleted})
+
+
+@app.route('/admin/batch_update_status', methods=['POST'])
+@admin_required
+def batch_update_status():
+    """批量更新验证码状态"""
+    data = request.json
+    codes = data.get('codes', [])
+    status = data.get('status', 'active')
+
+    if not codes:
+        return jsonify({'success': False, 'message': '未选择验证码'}), 400
+
+    if status not in ['active', 'inactive']:
+        return jsonify({'success': False, 'message': '无效的状态'}), 400
+
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+
+    placeholders = ','.join(['?' for _ in codes])
+    c.execute(f'UPDATE verification_codes SET status = ? WHERE code IN ({placeholders})', [status] + codes)
+
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'updated': updated})
+
+
+@app.route('/admin/reset_code', methods=['POST'])
+@admin_required
+def reset_code():
+    """重置验证码使用次数"""
+    data = request.json
+    code = data.get('code')
+
+    if not code:
+        return jsonify({'success': False, 'message': '未指定验证码'}), 400
+
+    conn = sqlite3.connect('codes.db')
+    c = conn.cursor()
+
+    c.execute('UPDATE verification_codes SET used_count = 0, status = "active" WHERE code = ?', (code,))
+
+    if c.rowcount == 0:
+        conn.close()
+        return jsonify({'success': False, 'message': '验证码不存在'}), 404
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True})
+
+
+# ==================== 启动 ====================
+
+if __name__ == '__main__':
+    init_db()
+    print("🚀 肖像照生成服务启动成功!")
+    print("📍 访问地址: http://localhost:5000")
+    print("🔧 管理后台: http://localhost:5000/admin")
+    print("💡 提示: 先运行 generate_codes.py 生成验证码")
+    app.run(debug=True, host='0.0.0.0', port=5000)
