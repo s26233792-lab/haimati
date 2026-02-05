@@ -26,34 +26,68 @@
     font-size: 14px;
 }
 
-/* 单个图片占位 */
-.showcase-placeholder-single {
+/* 效果对比展示 */
+.showcase-comparison-wrapper {
     display: flex;
     justify-content: center;
     margin-bottom: 24px;
 }
 
-.placeholder-box {
-    width: 200px;
-    height: 140px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.comparison-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #f8fafc;
     border-radius: 16px;
+    padding: 24px 32px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.comparison-side {
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 8px;
+    min-width: 100px;
+}
+
+.comparison-before .comparison-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+    display: flex;
+    align-items: center;
     justify-content: center;
-    color: white;
+    color: #64748b;
 }
 
-.placeholder-icon {
-    font-size: 48px;
-    margin-bottom: 8px;
+.comparison-after .comparison-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
 }
 
-.placeholder-box p {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
+.comparison-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.comparison-desc {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.comparison-arrow {
+    color: #8b5cf6;
+    display: flex;
+    align-items: center;
 }
 
 .showcase-features {
@@ -87,6 +121,36 @@
 
     .showcase-title h2 {
         font-size: 20px;
+    }
+
+    .comparison-card {
+        padding: 20px;
+        gap: 12px;
+    }
+
+    .comparison-before .comparison-avatar,
+    .comparison-after .comparison-avatar {
+        width: 60px;
+        height: 60px;
+    }
+
+    .comparison-before .comparison-avatar svg,
+    .comparison-after .comparison-avatar svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    .comparison-label {
+        font-size: 11px;
+    }
+
+    .comparison-desc {
+        font-size: 10px;
+    }
+
+    .comparison-arrow svg {
+        width: 24px;
+        height: 24px;
     }
 
     .showcase-features {
