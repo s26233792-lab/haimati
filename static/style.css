@@ -26,95 +26,34 @@
     font-size: 14px;
 }
 
-.showcase-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
+/* 单个图片占位 */
+.showcase-placeholder-single {
+    display: flex;
+    justify-content: center;
     margin-bottom: 24px;
 }
 
-.showcase-card {
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 16px;
-    transition: all 0.3s;
-}
-
-.showcase-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-}
-
-.showcase-comparison {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-
-.showcase-before,
-.showcase-after {
-    flex: 1;
-    text-align: center;
-}
-
-.showcase-label {
-    display: block;
-    font-size: 12px;
-    color: #64748b;
-    margin-bottom: 8px;
-    font-weight: 500;
-}
-
-.showcase-img {
+.placeholder-box {
+    width: 200px;
     height: 140px;
-    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
-    font-size: 14px;
-}
-
-.showcase-img-real {
-    width: 100%;
-    height: 140px;
-    object-fit: cover;
-    border-radius: 12px;
-}
-
-.placeholder-img {
-    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
-    color: #64748b;
-}
-
-.result-img-1 {
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
     color: white;
 }
 
-.result-img-2 {
-    background: linear-gradient(135deg, #667eea 0%, #4c51bf 100%);
-    color: white;
+.placeholder-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
 }
 
-.result-img-3 {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-}
-
-.showcase-arrow {
-    font-size: 24px;
-    color: #6366f1;
-    padding: 0 12px;
-    font-weight: bold;
-}
-
-.showcase-desc {
-    text-align: center;
-    font-size: 13px;
-    color: #64748b;
+.placeholder-box p {
     margin: 0;
+    font-size: 14px;
+    font-weight: 500;
 }
 
 .showcase-features {
@@ -144,10 +83,6 @@
     .showcase-section {
         padding: 20px 16px;
         border-radius: 16px;
-    }
-
-    .showcase-grid {
-        grid-template-columns: 1fr;
     }
 
     .showcase-title h2 {
