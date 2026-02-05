@@ -3,17 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>肖像照生成服务</title>
+    <title>AI肖像馆 - 美式肖像生成器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
+        <!-- 示例展示区域 -->
+        <div class="showcase-section">
+            <div class="showcase-title">
+                <h2>✨ AI生成效果展示</h2>
+                <p class="showcase-subtitle">真实案例 · 原图直出 · 美式专业风格</p>
+            </div>
+            <div class="showcase-grid" id="showcaseGrid">
+                <!-- 示例卡片将通过 JavaScript 动态加载 -->
+                <div class="showcase-loading">加载中...</div>
+            </div>
+            <div class="showcase-features">
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <span>30秒快速生成</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎨</span>
+                    <span>6种服装风格</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🖼️</span>
+                    <span>2种背景风格</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📸</span>
+                    <span>还原真实五官</span>
+                </div>
+            </div>
+        </div>
+
         <div class="main-card">
             <!-- 头部 -->
             <div class="text-center mb-4">
-                <h1 class="title">肖像照生成服务</h1>
-                <p class="subtitle">专业AI风格化，一键生成精美肖像</p>
+                <h1 class="title">AI肖像馆</h1>
+                <p class="subtitle">美式肖像生成器 | 30秒打造专业职场形象</p>
             </div>
 
             <!-- 步骤1: 输入验证码 -->
@@ -65,32 +95,47 @@
                         </select>
                     </div>
 
+                    <!-- 拍摄角度选择 -->
+                    <div class="mb-4">
+                        <label class="form-label">② 选择拍摄角度</label>
+                        <div class="angle-selector">
+                            <label class="angle-option">
+                                <input type="radio" name="angle" value="front" checked>
+                                <div class="angle-card">
+                                    <div class="angle-icon">📷</div>
+                                    <div class="angle-name">正面照</div>
+                                    <div class="angle-desc">标准正面肖像</div>
+                                </div>
+                            </label>
+                            <label class="angle-option">
+                                <input type="radio" name="angle" value="slight_tilt">
+                                <div class="angle-card">
+                                    <div class="angle-icon">📸</div>
+                                    <div class="angle-name">微微倾斜</div>
+                                    <div class="angle-desc">身体微侧，面部朝前</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- 背景选择 -->
                     <div class="mb-4">
-                        <label class="form-label">② 选择背景</label>
+                        <label class="form-label">③ 选择背景</label>
                         <div class="background-selector">
-                            <label class="background-option" data-bg="gray">
-                                <input type="radio" name="background" value="gray" checked>
+                            <label class="background-option" data-bg="textured">
+                                <input type="radio" name="background" value="textured" checked>
                                 <div class="bg-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                    <div class="bg-name">经典灰</div>
+                                    <div class="bg-icon">✨</div>
+                                    <div class="bg-name">质感影棚</div>
+                                    <div class="bg-desc">专业影棚质感，背景虚化</div>
                                 </div>
                             </label>
-                            <label class="background-option" data-bg="white">
-                                <input type="radio" name="background" value="white">
+                            <label class="background-option" data-bg="solid">
+                                <input type="radio" name="background" value="solid">
                                 <div class="bg-card" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
-                                    <div class="bg-name">纯净白</div>
-                                </div>
-                            </label>
-                            <label class="background-option" data-bg="blue">
-                                <input type="radio" name="background" value="blue">
-                                <div class="bg-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                    <div class="bg-name">深邃蓝</div>
-                                </div>
-                            </label>
-                            <label class="background-option" data-bg="warm">
-                                <input type="radio" name="background" value="warm">
-                                <div class="bg-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                                    <div class="bg-name">暖色调</div>
+                                    <div class="bg-icon">🎨</div>
+                                    <div class="bg-name">纯色背景</div>
+                                    <div class="bg-desc">纯净纯色，简洁干净</div>
                                 </div>
                             </label>
                         </div>
@@ -98,7 +143,7 @@
 
                     <!-- 图片上传 -->
                     <div class="mb-4">
-                        <label class="form-label">③ 上传照片</label>
+                        <label class="form-label">④ 上传照片</label>
                         <div class="upload-area" id="uploadArea">
                             <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" hidden>
                             <div class="upload-placeholder" id="uploadPlaceholder">
@@ -159,7 +204,7 @@
 
         <!-- 页脚 -->
         <div class="text-center mt-4 text-muted">
-            <small>如有问题请联系客服</small>
+            <small>AI肖像馆 - 美式肖像生成器 | 有问题请联系客服</small>
         </div>
     </div>
 

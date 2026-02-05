@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理后台 - 肖像照生成服务</title>
+    <title>管理后台 - AI肖像馆</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -74,12 +74,31 @@
             border-radius: 20px;
             font-weight: 600;
         }
+        /* 移动端响应式 - 批量操作栏 */
+        @media (max-width: 576px) {
+            .batch-actions {
+                width: 90%;
+                flex-wrap: wrap;
+                justify-content: center;
+                padding: 12px 16px;
+            }
+
+            .batch-actions .btn {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+
+            .selected-count {
+                font-size: 12px;
+                padding: 4px 10px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1><i class="bi bi-shield-lock"></i> 管理后台</h1>
+            <h1><i class="bi bi-shield-lock"></i> AI肖像馆 - 管理后台</h1>
             <div>
                 <a href="/admin/logout" class="btn btn-outline-danger me-2">
                     <i class="bi bi-box-arrow-right"></i> 退出登录
@@ -136,7 +155,10 @@
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateModal">
                     <i class="bi bi-plus-circle"></i> 生成新验证码
                 </button>
-                <a href="/admin/export_codes" class="btn btn-success">
+                <button class="btn btn-success" onclick="copyAllNewCodes()">
+                    <i class="bi bi-clipboard"></i> 复制所有新验证码
+                </button>
+                <a href="/admin/export_codes" class="btn btn-outline-success">
                     <i class="bi bi-download"></i> 导出验证码
                 </a>
                 <a href="/admin/export_security_logs" class="btn btn-info text-white">
@@ -267,6 +289,12 @@
     <!-- 批量操作栏 -->
     <div class="batch-actions" id="batchActions">
         <span class="selected-count">已选 <span id="selectedCount">0</span> 个</span>
+        <button class="btn btn-sm btn-primary" onclick="batchCopy()">
+            <i class="bi bi-clipboard"></i> 复制
+        </button>
+        <button class="btn btn-sm btn-success" onclick="batchCopyWithFormat()">
+            <i class="bi bi-clipboard-data"></i> 复制(带信息)
+        </button>
         <button class="btn btn-sm btn-danger" onclick="batchDelete()">
             <i class="bi bi-trash"></i> 删除
         </button>
@@ -290,13 +318,35 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- 套餐选择 -->
+                    <div class="mb-3">
+                        <label class="form-label">选择套餐</label>
+                        <select id="genPackage" class="form-select" onchange="updatePackageInfo()">
+                            <option value="1">体验版 (1次) - ¥9.9</option>
+                            <option value="3" selected>基础版 (3次) - ¥19.9</option>
+                            <option value="5">标准版 (5次) - ¥29.9</option>
+                            <option value="8">专业版 (8次) - ¥39.9</option>
+                            <option value="30">无限版 (30次) - ¥99.9</option>
+                            <option value="custom">自定义次数</option>
+                        </select>
+                    </div>
+
+                    <!-- 自定义次数（仅当选择"自定义"时显示） -->
+                    <div class="mb-3" id="customUsesDiv" style="display: none;">
+                        <label class="form-label">自定义次数</label>
+                        <input type="number" id="genUses" class="form-control" value="3" min="1" max="100">
+                    </div>
+
+                    <!-- 生成数量 -->
                     <div class="mb-3">
                         <label class="form-label">生成数量</label>
                         <input type="number" id="genCount" class="form-control" value="10" min="1" max="1000">
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">每个验证码最大使用次数</label>
-                        <input type="number" id="genUses" class="form-control" value="3" min="1" max="10">
+
+                    <!-- 预览信息 -->
+                    <div class="alert alert-info">
+                        <strong>预览：</strong>
+                        <span id="previewInfo">将生成 10 个 基础版 验证码，每个可使用 3 次</span>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -312,6 +362,16 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let selectedCodes = new Set();
+
+        // 套餐信息
+        const packages = {
+            '1': { name: '体验版', uses: 1, price: 9.9 },
+            '3': { name: '基础版', uses: 3, price: 19.9 },
+            '5': { name: '标准版', uses: 5, price: 29.9 },
+            '8': { name: '专业版', uses: 8, price: 39.9 },
+            '30': { name: '无限版', uses: 30, price: 99.9 },
+            'custom': { name: '自定义', uses: 0, price: 0 }
+        };
 
         function toggleSelectAll(section, checked) {
             const checkboxes = document.querySelectorAll(`input[data-section="${section}"].code-checkbox`);
@@ -347,6 +407,150 @@
             document.querySelectorAll('.select-all-checkbox').forEach(cb => cb.checked = false);
             selectedCodes.clear();
             updateBatchActions();
+        }
+
+        // 批量复制验证码（纯文本，每行一个）
+        async function batchCopy() {
+            if (selectedCodes.size === 0) {
+                alert('请先选择要复制的验证码');
+                return;
+            }
+
+            const codes = Array.from(selectedCodes).join('\n');
+
+            try {
+                await navigator.clipboard.writeText(codes);
+                showToast(`成功复制 ${selectedCodes.size} 个验证码到剪贴板`);
+            } catch (err) {
+                // 降级方案：使用传统方法
+                const textarea = document.createElement('textarea');
+                textarea.value = codes;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(`成功复制 ${selectedCodes.size} 个验证码到剪贴板`);
+                } catch (e) {
+                    alert('复制失败，请手动复制');
+                }
+                document.body.removeChild(textarea);
+            }
+        }
+
+        // 批量复制验证码（带详细信息的格式）
+        async function batchCopyWithFormat() {
+            if (selectedCodes.size === 0) {
+                alert('请先选择要复制的验证码');
+                return;
+            }
+
+            // 获取选中行的详细信息
+            const formattedCodes = [];
+            const checkboxes = document.querySelectorAll('.code-checkbox:checked');
+
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                const code = row.querySelector('code').textContent;
+                const maxUses = row.cells[2].textContent;
+                const usedCount = row.cells[3].textContent;
+                const remaining = row.cells[4].textContent;
+                formattedCodes.push(`${code} (剩余:${remaining}/${maxUses})`);
+            });
+
+            const text = formattedCodes.join('\n');
+
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast(`成功复制 ${selectedCodes.size} 个验证码（含详细信息）`);
+            } catch (err) {
+                // 降级方案
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(`成功复制 ${selectedCodes.size} 个验证码（含详细信息）`);
+                } catch (e) {
+                    alert('复制失败，请手动复制');
+                }
+                document.body.removeChild(textarea);
+            }
+        }
+
+        // 显示提示消息
+        function showToast(message) {
+            // 创建toast元素
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-success position-fixed';
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 250px; animation: slideIn 0.3s ease;';
+            toast.innerHTML = `<i class="bi bi-check-circle"></i> ${message}`;
+
+            // 添加样式
+            if (!document.getElementById('toast-style')) {
+                const style = document.createElement('style');
+                style.id = 'toast-style';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(toast);
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 复制所有新验证码（未使用的）
+        async function copyAllNewCodes() {
+            const newCodeCheckboxes = document.querySelectorAll('#newCodesBody .code-checkbox');
+
+            if (newCodeCheckboxes.length === 0) {
+                alert('暂无新验证码可复制');
+                return;
+            }
+
+            const codes = [];
+            newCodeCheckboxes.forEach(cb => {
+                codes.push(cb.value);
+            });
+
+            const text = codes.join('\n');
+
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast(`成功复制 ${codes.length} 个新验证码到剪贴板`);
+            } catch (err) {
+                // 降级方案
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(`成功复制 ${codes.length} 个新验证码到剪贴板`);
+                } catch (e) {
+                    alert('复制失败，请手动复制');
+                }
+                document.body.removeChild(textarea);
+            }
         }
 
         async function batchDelete() {
@@ -423,9 +627,51 @@
             }
         }
 
-        async function generateCodes() {
+        // 套餐选择变化时更新显示
+        function updatePackageInfo() {
+            const packageValue = document.getElementById('genPackage').value;
+            const customUsesDiv = document.getElementById('customUsesDiv');
+
+            if (packageValue === 'custom') {
+                customUsesDiv.style.display = 'block';
+                document.getElementById('genUses').disabled = false;
+            } else {
+                customUsesDiv.style.display = 'none';
+                document.getElementById('genUses').disabled = true;
+            }
+            updatePreview();
+        }
+
+        // 更新预览信息
+        function updatePreview() {
+            const packageValue = document.getElementById('genPackage').value;
             const count = document.getElementById('genCount').value;
-            const uses = document.getElementById('genUses').value;
+            let uses, packageName;
+
+            if (packageValue === 'custom') {
+                uses = document.getElementById('genUses').value;
+                packageName = '自定义';
+            } else {
+                const pkg = packages[packageValue];
+                uses = pkg.uses;
+                packageName = pkg.name;
+            }
+
+            document.getElementById('previewInfo').textContent =
+                `将生成 ${count} 个 ${packageName} 验证码，每个可使用 ${uses} 次`;
+        }
+
+        // 生成验证码
+        async function generateCodes() {
+            const packageValue = document.getElementById('genPackage').value;
+            const count = document.getElementById('genCount').value;
+            let uses;
+
+            if (packageValue === 'custom') {
+                uses = document.getElementById('genUses').value;
+            } else {
+                uses = packageValue;
+            }
 
             const response = await fetch('/admin/generate_codes', {
                 method: 'POST',
@@ -445,6 +691,16 @@
                 alert('生成失败');
             }
         }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePackageInfo();
+
+            // 监听输入变化
+            document.getElementById('genPackage').addEventListener('change', updatePackageInfo);
+            document.getElementById('genCount').addEventListener('input', updatePreview);
+            document.getElementById('genUses').addEventListener('input', updatePreview);
+        });
     </script>
 </body>
 </html>

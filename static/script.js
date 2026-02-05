@@ -210,6 +210,7 @@ async function generatePortrait() {
 
     // 获取选中的配置
     const clothing = document.getElementById('clothingSelect').value;
+    const angle = document.querySelector('input[name="angle"]:checked').value;
     const background = document.querySelector('input[name="background"]:checked').value;
 
     // 显示进度，隐藏错误
@@ -223,6 +224,7 @@ async function generatePortrait() {
     formData.append('code', currentCode);
     formData.append('style', 'portrait');  // 固定使用 portrait 风格
     formData.append('clothing', clothing);
+    formData.append('angle', angle);
     formData.append('background', background);
 
     try {
@@ -273,4 +275,59 @@ codeInput.addEventListener('keypress', (e) => {
 // 页面加载完成
 document.addEventListener('DOMContentLoaded', () => {
     console.log('肖像照生成服务已加载');
+    loadShowcaseExamples();
 });
+
+// 加载示例图片
+async function loadShowcaseExamples() {
+    const showcaseGrid = document.getElementById('showcaseGrid');
+    if (!showcaseGrid) return;
+
+    try {
+        const response = await fetch('/api/showcase');
+        const data = await response.json();
+
+        if (data.success && data.examples) {
+            showcaseGrid.innerHTML = '';
+
+            data.examples.forEach(example => {
+                const card = document.createElement('div');
+                card.className = 'showcase-card';
+                card.innerHTML = `
+                    <div class="showcase-comparison">
+                        <div class="showcase-before">
+                            <span class="showcase-label">原图</span>
+                            <img src="/${example.before}" alt="原图" class="showcase-img-real" onerror="this.parentElement.innerHTML='<div class=\\'showcase-img placeholder-img\\'>图片加载中</div>'">
+                        </div>
+                        <div class="showcase-arrow">→</div>
+                        <div class="showcase-after">
+                            <span class="showcase-label">生成后</span>
+                            <img src="/${example.after}" alt="生成后" class="showcase-img-real" onerror="this.parentElement.innerHTML='<div class=\\'showcase-img result-img-1\\'>图片加载中</div>'">
+                        </div>
+                    </div>
+                    <p class="showcase-desc">${example.desc}</p>
+                `;
+                showcaseGrid.appendChild(card);
+            });
+        }
+    } catch (error) {
+        console.error('加载示例失败:', error);
+        // 使用占位内容
+        showcaseGrid.innerHTML = `
+            <div class="showcase-card">
+                <div class="showcase-comparison">
+                    <div class="showcase-before">
+                        <span class="showcase-label">原图</span>
+                        <div class="showcase-img placeholder-img">普通自拍</div>
+                    </div>
+                    <div class="showcase-arrow">→</div>
+                    <div class="showcase-after">
+                        <span class="showcase-label">生成后</span>
+                        <div class="showcase-img result-img-1">商务肖像</div>
+                    </div>
+                </div>
+                <p class="showcase-desc">商务西装 + 灰色背景</p>
+            </div>
+        `;
+    }
+}

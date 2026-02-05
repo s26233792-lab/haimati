@@ -354,13 +354,14 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
     conn.close()
 
 
-def call_nanobanana_api(image_path, style, clothing, background):
+def call_nanobanana_api(image_path, style, clothing, angle, background):
     """
     调用图片生成 API (12ai.org NanoBanana Pro)
 
     参数:
         style: 风格 (portrait)
         clothing: 服装 (business_suit, formal_dress, casual_shirt, turtleneck, tshirt)
+        angle: 拍摄角度 (front, slight_tilt)
         background: 背景 (gray, white, blue, warm)
     """
     import base64
@@ -383,24 +384,30 @@ def call_nanobanana_api(image_path, style, clothing, background):
 
     # 背景处理
     background_map = {
-        'gray': '灰色',
-        'white': '白色',
-        'blue': '蓝色',
-        'warm': '暖色'
+        'textured': '质感影棚背景，柔和自然光，背景略微虚化，营造专业氛围',
+        'solid': '纯净纯色背景，简洁干净，颜色均匀，无杂色'
+    }
+
+    # 角度处理
+    angle_map = {
+        'front': '正面照，完全正对镜头',
+        'slight_tilt': '微微倾斜角度，身体微侧，面部朝前'
     }
 
     # 构建文本 prompt
-    prompt_text = f"""美式专业职场风格肖像照，正面半身肖像。
+    angle_desc = angle_map.get(angle, '正面照，完全正对镜头')
+    bg_desc = background_map.get(background, '质感影棚背景，柔和自然光，背景略微虚化，营造专业氛围')
+    prompt_text = f"""美式专业职场风格肖像照，{angle_desc}半身肖像。
 
 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份。
 
 服装：{clothing_map.get(clothing, '商务西装')}。
 
-背景：{background_map.get(background, '灰色')}色背景，质感影棚背景，柔和自然光，背景略微虚化。
+背景：{bg_desc}。
 
-姿态：如军人般挺拔，强调宽肩，非正面（身体微侧，面部朝前）。
+姿态：如军人般挺拔，强调宽肩{', ' + angle_desc if angle == 'slight_tilt' else '，完全正对镜头'}。
 
-画质：超高清，4K分辨率，清晰对焦，肤色真实自然，构图干净优雅，微微倾斜镜头，保留所有细节。
+画质：超高清，4K分辨率，清晰对焦，肤色真实自然，构图干净优雅{'，微微倾斜镜头' if angle == 'slight_tilt' else ''}，保留所有细节。
 
 画面尺寸：3:4，输出最高质量的图片，分辨率不低于 2048x2730 像素。"""
 
@@ -543,10 +550,8 @@ def call_nanobanana_api(image_path, style, clothing, background):
 
     # 背景颜色映射 (用于模拟模式)
     background_colors = {
-        'gray': (128, 128, 128),
-        'white': (245, 245, 245),
-        'blue': (102, 126, 234),
-        'warm': (245, 147, 251)
+        'textured': (128, 128, 128),  # 质感影棚 - 使用灰色
+        'solid': (245, 245, 245)      # 纯色背景 - 使用白色
     }
 
     try:
@@ -641,7 +646,8 @@ def upload():
     code = request.form.get('code', '').strip()
     style = request.form.get('style', 'portrait')
     clothing = request.form.get('clothing', 'business_suit')
-    background = request.form.get('background', 'gray')
+    angle = request.form.get('angle', 'front')
+    background = request.form.get('background', 'textured')
 
     # 验证验证码
     result, error = verify_code(code)
@@ -668,7 +674,7 @@ def upload():
 
     # 调用 API 生成图片
     try:
-        result_path = call_nanobanana_api(filepath, style, clothing, background)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background)
 
         # 扣减使用次数
         use_code(code)
@@ -689,6 +695,15 @@ def upload():
 @app.route('/result/<filename>')
 def result(filename):
     """返回生成的图片"""
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    return "图片不存在", 404
+
+
+@app.route('/uploads/<filename>')
+def uploads(filename):
+    """返回上传的原始图片（用于示例展示）"""
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if os.path.exists(filepath):
         return send_file(filepath)
@@ -741,6 +756,32 @@ def status(code):
         'max_uses': result['max_uses'],
         'history': [{'style': row[0], 'time': row[1], 'result': row[2]} for row in logs]
     })
+
+
+@app.route('/api/showcase')
+def showcase():
+    """获取示例图片列表（用于首页展示）"""
+    examples = [
+        {
+            'id': 1,
+            'before': 'uploads/20260204_194214_IMG_6217.JPG',
+            'after': 'uploads/20260204_194214_IMG_6217_result.JPG',
+            'desc': '商务西装 + 质感影棚'
+        },
+        {
+            'id': 2,
+            'before': 'uploads/20260204_194227_HAAS4nYacAAp2Td.jpg',
+            'after': 'uploads/20260204_194227_HAAS4nYacAAp2Td_result.jpg',
+            'desc': '正装礼服 + 质感影棚'
+        },
+        {
+            'id': 3,
+            'before': 'uploads/20260204_201428_G_ktJfGaIAABVef.jpg',
+            'after': 'uploads/20260204_201428_G_ktJfGaIAABVef_result.jpg',
+            'desc': '休闲衬衫 + 纯色背景'
+        }
+    ]
+    return jsonify({'success': True, 'examples': examples})
 
 
 # ==================== 管理后台路由 ====================
@@ -947,7 +988,7 @@ def reset_code():
 init_db()
 
 if __name__ == '__main__':
-    print("🚀 肖像照生成服务启动成功!")
+    print("🚀 AI肖像馆 - 美式肖像生成器 启动成功!")
     print("📍 访问地址: http://localhost:5000")
     print("🔧 管理后台: http://localhost:5000/admin")
     print("💡 提示: 先运行 generate_codes.py 生成验证码")
