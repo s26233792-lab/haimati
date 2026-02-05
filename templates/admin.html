@@ -158,6 +158,9 @@
                 <button class="btn btn-success" onclick="copyAllNewCodes()">
                     <i class="bi bi-clipboard"></i> 复制所有新验证码
                 </button>
+                <button class="btn btn-outline-info" onclick="checkApiConfig()">
+                    <i class="bi bi-gear"></i> 检查API配置
+                </button>
                 <button class="btn btn-info" onclick="generateComparisonImage()">
                     <i class="bi bi-magic"></i> 生成首页对比图
                 </button>
@@ -758,6 +761,29 @@
         // 关闭展示预览
         function closeShowcasePreview() {
             document.getElementById('showcasePreview').style.display = 'none';
+        }
+
+        // 检查 API 配置
+        async function checkApiConfig() {
+            try {
+                const response = await fetch('/admin/check_api_config');
+                const data = await response.json();
+
+                let message = 'API 配置检查结果:\n\n';
+                message += `API Key: ${data.api_key_configured ? '✓ 已配置' : '✗ 未配置'}\n`;
+                message += `API Key 长度: ${data.api_key_length}\n`;
+                message += `API Key 前缀: ${data.api_key_prefix || 'N/A'}\n`;
+                message += `API URL: ${data.api_url}\n`;
+                message += `API Model: ${data.api_model}`;
+
+                alert(message);
+
+                if (!data.api_key_configured) {
+                    alert('⚠️ API Key 未配置！\n\n请在 Railway Variables 中设置:\nNANOBANANA_API_KEY');
+                }
+            } catch (err) {
+                alert('检查失败: ' + err.message);
+            }
         }
     </script>
 </body>

@@ -1005,11 +1005,25 @@ def batch_update_status():
     return jsonify({'success': True, 'updated': updated})
 
 
+@app.route('/admin/check_api_config', methods=['GET'])
+@admin_required
+def check_api_config():
+    """检查 API 配置"""
+    return jsonify({
+        'api_key_configured': bool(NANOBANANA_API_KEY),
+        'api_key_length': len(NANOBANANA_API_KEY) if NANOBANANA_API_KEY else 0,
+        'api_key_prefix': NANOBANANA_API_KEY[:10] + '...' if NANOBANANA_API_KEY else None,
+        'api_url': NANOBANANA_API_URL,
+        'api_model': os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview-2k')
+    })
+
+
 @app.route('/admin/generate_comparison_image', methods=['POST'])
 @admin_required
 def generate_comparison_image():
     """生成首页展示对比图（一次性使用）"""
     import base64
+    import json
 
     prompt = """
 Create a side-by-side comparison image (400x200 pixels) showing the SAME Asian person's transformation:
@@ -1039,13 +1053,25 @@ MIDDLE: A subtle arrow pointing from left to right
         "generationConfig": {"temperature": 0.7, "topK": 32, "topP": 0.95}
     }
 
+    # 检查配置
+    if not NANOBANANA_API_KEY:
+        return jsonify({'success': False, 'message': 'API Key 未配置，请在 Railway Variables 中设置 NANOBANANA_API_KEY'})
+
     try:
         request_url = f"{NANOBANANA_API_URL}?key={NANOBANANA_API_KEY}"
         headers = {'Content-Type': 'application/json'}
-        response = requests.post(request_url, json=payload, headers=headers, timeout=180)
+
+        print(f"[对比图生成] 请求 URL: {NANOBANANA_API_URL}")
+        print(f"[对比图生成] API Key 长度: {len(NANOBANANA_API_KEY)}")
+        print(f"[对比图生成] Prompt 长度: {len(prompt)}")
+
+        response = requests.post(request_url, json=payload, headers=headers, timeout=300)
+
+        print(f"[对比图生成] 响应状态码: {response.status_code}")
 
         if response.status_code == 200:
             result = response.json()
+            print(f"[对比图生成] 响应键: {list(result.keys())}")
 
             # 处理 Gemini 响应
             if 'candidates' in result and len(result['candidates']) > 0:
@@ -1067,16 +1093,34 @@ MIDDLE: A subtle arrow pointing from left to right
                             with open(upload_path, 'wb') as f:
                                 f.write(image_data)
 
+                            print(f"[对比图生成] ✓ 成功! 文件大小: {len(image_data)} bytes")
                             return jsonify({
                                 'success': True,
                                 'static_path': '/static/images/showcase_comparison.png',
                                 'upload_path': '/result/showcase_comparison.png'
                             })
 
-        return jsonify({'success': False, 'message': f'生成失败: {response.status_code}'})
+            # 检查是否有错误
+            if 'error' in result:
+                error_msg = result['error'].get('message', '未知错误')
+                print(f"[对比图生成] API 返回错误: {error_msg}")
+                return jsonify({'success': False, 'message': f'API 错误: {error_msg}'})
 
+            print(f"[对比图生成] 响应格式未知: {json.dumps(result, ensure_ascii=False)[:200]}")
+            return jsonify({'success': False, 'message': '响应格式未知，请查看日志'})
+
+        else:
+            print(f"[对比图生成] HTTP 错误: {response.status_code}")
+            print(f"[对比图生成] 响应内容: {response.text[:500]}")
+            return jsonify({'success': False, 'message': f'HTTP 错误 {response.status_code}: {response.text[:200]}'})
+
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'message': '请求超时，API 响应时间过长（超过5分钟）'})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+        print(f"[对比图生成] 异常: {type(e).__name__}: {e}")
+        import traceback
+        print(f"[对比图生成] 堆栈: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': f'生成失败: {str(e)}'})
 
 
 @app.route('/admin/generate_showcase', methods=['GET', 'POST'])
