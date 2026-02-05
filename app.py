@@ -78,7 +78,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
 # 12ai.org 代理的 Gemini 图片生成 API
-NANOBANANA_API_MODEL = os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview')
+NANOBANANA_API_MODEL = os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview-2k')
 NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL',
     f'https://cdn.12ai.org/v1beta/models/{NANOBANANA_API_MODEL}:generateContent')
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
