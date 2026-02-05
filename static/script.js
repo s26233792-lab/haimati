@@ -222,6 +222,7 @@ async function generatePortrait() {
     const angle = document.querySelector('input[name="angle"]:checked').value;
     const background = document.querySelector('input[name="background"]:checked').value;
     const bgColor = document.querySelector('input[name="bgColor"]:checked')?.value || 'white';
+    const beautify = document.querySelector('input[name="beautify"]:checked').value;
 
     // 显示进度，隐藏错误
     step2Error.style.display = 'none';
@@ -237,6 +238,7 @@ async function generatePortrait() {
     formData.append('angle', angle);
     formData.append('background', background);
     formData.append('bgColor', bgColor);
+    formData.append('beautify', beautify);
 
     try {
         const response = await fetch('/api/upload', {

@@ -354,7 +354,7 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
     conn.close()
 
 
-def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color='white'):
+def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color='white', beautify='no'):
     """
     调用图片生成 API (12ai.org NanoBanana Pro)
 
@@ -363,7 +363,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         clothing: 服装 (business_suit, formal_dress, casual_shirt, turtleneck, tshirt)
         angle: 拍摄角度 (front, slight_tilt)
         background: 背景 (textured, solid)
-        bg_color: 背景色 (white, gray, blue, black, warm) - 仅当 background=solid 时有效
+        bg_color: 背景色 (white, gray, blue, black, warm)
+        beautify: 是否美颜 (yes, no)
     """
     import base64
     from PIL import Image, ImageFilter, ImageEnhance
@@ -408,6 +409,12 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     angle_desc = angle_map.get(angle, '正面照，完全正对镜头')
     color_desc = bg_color_map.get(bg_color, '白色')
 
+    # 美颜处理
+    if beautify == 'yes':
+        beauty_desc = "轻微美颜效果，自然提亮肤色，优化肤质，保持真实五官比例"
+    else:
+        beauty_desc = "保持真实面容，不添加美颜效果"
+
     # 根据背景类型选择描述
     if background == 'solid':
         bg_desc = f"纯净{color_desc}背景，颜色均匀，无杂色"
@@ -417,6 +424,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     prompt_text = f"""美式专业职场风格肖像照，{angle_desc}半身肖像。
 
 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份。
+
+皮肤处理：{beauty_desc}。
 
 服装：{clothing_map.get(clothing, '商务西装')}。
 
@@ -615,7 +624,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         print(f"[模拟模式] 图片已处理: {result_path}")
         bg_type_text = '质感影棚' if background == 'textured' else '纯色背景'
         bg_color_text = {'white': '白色', 'gray': '灰色', 'blue': '蓝色', 'black': '深灰', 'warm': '暖色'}.get(bg_color, '白色')
-        print(f"  风格: {style}, 服装: {clothing}, ���景: {bg_type_text}({bg_color_text})")
+        beauty_text = '轻微美颜' if beautify == 'yes' else '无美颜'
+        print(f"  风格: {style}, 服装: {clothing}, 背景: {bg_type_text}({bg_color_text}), 美颜: {beauty_text}")
 
         return result_path
 
@@ -685,6 +695,7 @@ def upload():
     angle = request.form.get('angle', 'front')
     background = request.form.get('background', 'textured')
     bg_color = request.form.get('bgColor', 'white')  # 获取背景色，默认白色
+    beautify = request.form.get('beautify', 'no')  # 获取美颜选项，默认不美颜
 
     # 验证验证码
     result, error = verify_code(code)
@@ -711,7 +722,7 @@ def upload():
 
     # 调用 API 生成图片
     try:
-        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
 
         # 扣减使用次数
         use_code(code)

@@ -121,9 +121,32 @@
                         </div>
                     </div>
 
+                    <!-- 美颜开关 -->
+                    <div class="mb-4">
+                        <label class="form-label">③ 美颜效果</label>
+                        <div class="beautify-toggle">
+                            <label class="toggle-option">
+                                <input type="radio" name="beautify" value="no" checked>
+                                <div class="toggle-card">
+                                    <div class="toggle-icon">📷</div>
+                                    <div class="toggle-name">保持原貌</div>
+                                    <div class="toggle-desc">真实还原，不修饰</div>
+                                </div>
+                            </label>
+                            <label class="toggle-option">
+                                <input type="radio" name="beautify" value="yes">
+                                <div class="toggle-card">
+                                    <div class="toggle-icon">✨</div>
+                                    <div class="toggle-name">轻微美颜</div>
+                                    <div class="toggle-desc">自然提亮，肤质优化</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- 背景选择 -->
                     <div class="mb-4">
-                        <label class="form-label">③ 选择背景</label>
+                        <label class="form-label">④ 选择背景</label>
                         <div class="background-selector">
                             <label class="background-option" data-bg="textured">
                                 <input type="radio" name="background" value="textured" checked onchange="updateColorLabel()">
@@ -183,7 +206,7 @@
 
                     <!-- 图片上传 -->
                     <div class="mb-4">
-                        <label class="form-label">④ 上传照片</label>
+                        <label class="form-label">⑤ 上传照片</label>
                         <div class="upload-area" id="uploadArea">
                             <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" hidden>
                             <div class="upload-placeholder" id="uploadPlaceholder">
