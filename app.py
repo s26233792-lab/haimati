@@ -566,8 +566,18 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                                     print(f"[API] 原图大小: {original_size} bytes")
                                     print(f"[API] 生成图片大小: {len(image_data)} bytes")
 
+                                    # 检查是否和原图大小相同（可能返回了原图）
+                                    if abs(len(image_data) - original_size) < 100:
+                                        print(f"[API] ⚠️ 警告: 生成图片大小与原图几乎相同！")
+                                        print(f"[API] ⚠️ 可能 API 返回了原图而不是生成的新图片")
+
                                     with open(result_path, 'wb') as f:
                                         f.write(image_data)
+
+                                    # 验证保存后的文件大小
+                                    saved_size = os.path.getsize(result_path)
+                                    print(f"[API] 保存后大小: {saved_size} bytes")
+
                                     print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'gemini'
