@@ -766,6 +766,28 @@ def uploads(filename):
     return "图片不存在", 404
 
 
+@app.route('/debug/test')
+def debug_test():
+    """简单测试端点"""
+    try:
+        import os
+        import sys
+
+        result = {
+            'status': 'ok',
+            'python_version': sys.version,
+            'working_directory': os.getcwd(),
+            'env_vars': {
+                'NANOBANANA_API_KEY': bool(os.getenv('NANOBANANA_API_KEY')),
+                'SECRET_KEY': bool(os.getenv('SECRET_KEY')),
+                'RAILWAY_ENVIRONMENT': os.getenv('RAILWAY_ENVIRONMENT'),
+            }
+        }
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/debug/config')
 def debug_config():
     """调试端点 - 检查配置"""
