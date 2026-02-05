@@ -469,7 +469,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     # ==================== 打印 JSON 用于调试 ====================
     print(f"[API Request] Prompt:")
     print(prompt_text)
-    print(f"[API Request] Target URL: {NANOBANANA_API_URL}")
+    print(f"[API Request] 使用的模型: {NANOBANANA_API_MODEL}")
+    print(f"[API Request] 请求的 URL: {NANOBANANA_API_URL}")
     print("-" * 60)
 
     # ========== 真实 API 调用部分 ==========
@@ -497,6 +498,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             ))
 
             print(f"[API] 请求 URL: {api_url}")
+            print(f"[API] 模型: {NANOBANANA_API_MODEL}")
             print(f"[API] 请求超时: 120秒")
 
             # 捕获所有可能的异常
