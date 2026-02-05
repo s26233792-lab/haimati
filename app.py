@@ -547,20 +547,37 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
                 if 'candidates' in result and len(result['candidates']) > 0:
                     candidate = result['candidates'][0]
-                    if 'content' in candidate and 'parts' in candidate['content']:
-                        for part in candidate['content']['parts']:
-                            # 检查 inlineData（驼峰命名）或 inline_data（下划线命名）
-                            inline_data = part.get('inlineData') or part.get('inline_data')
-                            if inline_data and 'data' in inline_data:
-                                import base64
-                                image_data = base64.b64decode(inline_data['data'])
-                                result_path = image_path.replace('.', '_result.')
-                                with open(result_path, 'wb') as f:
-                                    f.write(image_data)
-                                print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
-                                last_api_call['success'] = True
-                                last_api_call['format'] = 'gemini'
-                                return result_path
+                    print(f"[API] Candidate 数据: {list(candidate.keys())}")
+                    if 'content' in candidate:
+                        print(f"[API] Content 数据存在: True")
+                        if 'parts' in candidate['content']:
+                            print(f"[API] Parts 数量: {len(candidate['content']['parts'])}")
+                            for i, part in enumerate(candidate['content']['parts']):
+                                print(f"[API] Part {i} keys: {list(part.keys())}")
+                                # 检查 inlineData（驼峰命名）或 inline_data（下划线命名）
+                                inline_data = part.get('inlineData') or part.get('inline_data')
+                                if inline_data and 'data' in inline_data:
+                                    import base64
+                                    image_data = base64.b64decode(inline_data['data'])
+                                    result_path = image_path.replace('.', '_result.')
+
+                                    # 检查图片大小
+                                    original_size = os.path.getsize(image_path)
+                                    print(f"[API] 原图大小: {original_size} bytes")
+                                    print(f"[API] 生成图片大小: {len(image_data)} bytes")
+
+                                    with open(result_path, 'wb') as f:
+                                        f.write(image_data)
+                                    print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
+                                    last_api_call['success'] = True
+                                    last_api_call['format'] = 'gemini'
+                                    return result_path
+                                else:
+                                    print(f"[API] Part {i} 没有 inlineData")
+                        else:
+                            print(f"[API] Content 中没有 parts")
+                    else:
+                        print(f"[API] Candidate 中没有 content")
 
                 # ========== 兼容其他格式 ==========
                 # 格式1: {"image": "base64_string"}
@@ -591,6 +608,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                         last_api_call['error'] = f'下载失败: {img_response.status_code}'
 
                 print(f"[API] ⚠ 未知响应格式，使用模拟模式")
+                print(f"[API] 完整响应: {json.dumps(result, ensure_ascii=False)[:800]}")
                 last_api_call['error'] = '未知响应格式'
             else:
                 print(f"[API] ✗ API 调用失败: {response.status_code}")
@@ -609,6 +627,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         last_api_call['error'] = 'API Key 未配置'
 
     # ========== 模拟模式：对图片进行简单处理 ==========
+    print(f"[模拟模式] 开始处理图片")
+    print(f"[模拟模式] 原图: {image_path}")
     # 服装名称映射 (用于显示)
     clothing_names = {
         'business_suit': '商务西装',
