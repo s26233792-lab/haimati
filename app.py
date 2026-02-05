@@ -437,6 +437,14 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
 画面尺寸：3:4，输出最高质量的图片，分辨率不低于 2048x2730 像素。"""
 
+    # ==================== 打印调试信息 ====================
+    print(f"[Prompt] 服装: {clothing} -> {clothing_map.get(clothing, '商务西装')}")
+    print(f"[Prompt] 角度: {angle} -> {angle_desc}")
+    print(f"[Prompt] 背景: {background} + {bg_color} -> {bg_desc}")
+    print(f"[Prompt] 美颜: {beautify} -> {beauty_desc}")
+    print(f"[Prompt] 完整 Prompt:\n{prompt_text}")
+    print("=" * 60)
+
     # ==================== 构建请求 payload (Gemini 格式) ====================
     payload = {
         "contents": [{
