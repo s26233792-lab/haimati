@@ -1005,6 +1005,69 @@ def batch_update_status():
     return jsonify({'success': True, 'updated': updated})
 
 
+@app.route('/admin/generate_showcase', methods=['GET', 'POST'])
+@admin_required
+def generate_showcase():
+    """生成展示对比图"""
+    import base64
+
+    prompt = """
+Create a comparison image showing the same person's portrait transformation.
+
+Left side (50% of image): Original casual photo - A person's face in casual lighting, gray background, flat look
+Right side (50% of image): Professional portrait - Same person, professional studio lighting, purple gradient background, wearing business suit, polished look
+Middle: Arrow pointing from left to right
+Bottom labels: "原图" on left, "生成后" on right
+
+Style: Clean, modern comparison image, 400x200 pixels.
+"""
+
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "temperature": 0.7,
+            "topK": 32,
+            "topP": 0.95,
+            "candidateCount": 1
+        }
+    }
+
+    try:
+        request_url = f"{NANOBANANA_API_URL}?key={NANOBANANA_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+
+        response = requests.post(request_url, json=payload, headers=headers, timeout=120)
+
+        if response.status_code == 200:
+            result = response.json()
+
+            if 'candidates' in result and len(result['candidates']) > 0:
+                candidate = result['candidates'][0]
+                if 'content' in candidate and 'parts' in candidate['content']:
+                    for part in candidate['content']['parts']:
+                        inline_data = part.get('inlineData') or part.get('inline_data')
+                        if inline_data and 'data' in inline_data:
+                            image_data = base64.b64decode(inline_data['data'])
+                            output_path = os.path.join(upload_folder, 'showcase_comparison.png')
+                            with open(output_path, 'wb') as f:
+                                f.write(image_data)
+                            return jsonify({'success': True, 'path': '/result/showcase_comparison.png'})
+
+            if 'image' in result:
+                image_data = base64.b64decode(result['image'])
+                output_path = os.path.join(upload_folder, 'showcase_comparison.png')
+                with open(output_path, 'wb') as f:
+                    f.write(image_data)
+                return jsonify({'success': True, 'path': '/result/showcase_comparison.png'})
+
+        return jsonify({'success': False, 'message': f'API调用失败: {response.status_code}'})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
 @app.route('/admin/reset_code', methods=['POST'])
 @admin_required
 def reset_code():
