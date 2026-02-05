@@ -722,7 +722,12 @@ def upload():
 
     # 调用 API 生成图片
     try:
+        print(f"[Upload] 开始处理上传: {filename}")
+        print(f"[Upload] 配置: style={style}, clothing={clothing}, angle={angle}, bg={background}, color={bg_color}, beautify={beautify}")
+
         result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
+
+        print(f"[Upload] API 调用成功: {result_path}")
 
         # 扣减使用次数
         use_code(code)
@@ -737,6 +742,9 @@ def upload():
         })
 
     except Exception as e:
+        import traceback
+        print(f"[Upload] 异常: {type(e).__name__}: {e}")
+        print(f"[Upload] 堆栈: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': f'生成失败: {str(e)}'}), 500
 
 

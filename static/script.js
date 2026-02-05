@@ -246,7 +246,11 @@ async function generatePortrait() {
             body: formData
         });
 
+        console.log('[API] 响应状态:', response.status);
+
         const data = await response.json();
+
+        console.log('[API] 响应数据:', data);
 
         if (data.success) {
             // 更新剩余次数
@@ -269,9 +273,17 @@ async function generatePortrait() {
             generateBtn.disabled = false;
         }
     } catch (error) {
-        step2Error.textContent = '⚠️ 网络错误，请检查连接后重试';
+        console.error('[API] 请求异常:', error);
+        let errorMsg = '⚠️ 网络错误，请检查连接后重试';
+
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            errorMsg = '⚠️ 无法连接到服务器，请检查网络或稍后重试';
+        } else if (error.message) {
+            errorMsg = `⚠️ 请求失败: ${error.message}`;
+        }
+
+        step2Error.textContent = errorMsg;
         step2Error.style.display = 'block';
-        console.error(error);
         generateBtn.disabled = false;
     } finally {
         progressArea.style.display = 'none';
