@@ -5,6 +5,15 @@ let currentCode = '';
 let selectedFile = null;
 let remainingCount = 0;
 
+// 切换背景色选项显示
+function toggleColorOptions() {
+    const background = document.querySelector('input[name="background"]:checked').value;
+    const colorOptions = document.getElementById('colorOptions');
+    if (colorOptions) {
+        colorOptions.style.display = (background === 'solid') ? 'block' : 'none';
+    }
+}
+
 // DOM 元素
 const codeInput = document.getElementById('codeInput');
 const codeError = document.getElementById('codeError');
@@ -212,6 +221,7 @@ async function generatePortrait() {
     const clothing = document.getElementById('clothingSelect').value;
     const angle = document.querySelector('input[name="angle"]:checked').value;
     const background = document.querySelector('input[name="background"]:checked').value;
+    const bgColor = document.querySelector('input[name="bgColor"]:checked')?.value || 'white';
 
     // 显示进度，隐藏错误
     step2Error.style.display = 'none';
@@ -226,6 +236,7 @@ async function generatePortrait() {
     formData.append('clothing', clothing);
     formData.append('angle', angle);
     formData.append('background', background);
+    formData.append('bgColor', bgColor);
 
     try {
         const response = await fetch('/api/upload', {

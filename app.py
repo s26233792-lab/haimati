@@ -354,7 +354,7 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
     conn.close()
 
 
-def call_nanobanana_api(image_path, style, clothing, angle, background):
+def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color='white'):
     """
     调用图片生成 API (12ai.org NanoBanana Pro)
 
@@ -362,7 +362,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background):
         style: 风格 (portrait)
         clothing: 服装 (business_suit, formal_dress, casual_shirt, turtleneck, tshirt)
         angle: 拍摄角度 (front, slight_tilt)
-        background: 背景 (gray, white, blue, warm)
+        background: 背景 (textured, solid)
+        bg_color: 背景色 (white, gray, blue, black, warm) - 仅当 background=solid 时有效
     """
     import base64
     from PIL import Image, ImageFilter, ImageEnhance
@@ -388,6 +389,15 @@ def call_nanobanana_api(image_path, style, clothing, angle, background):
         'solid': '纯净纯色背景，简洁干净，颜色均匀，无杂色'
     }
 
+    # 背景色处理（仅当选择 solid 时有效）
+    bg_color_map = {
+        'white': '纯白色背景 (#FFFFFF)',
+        'gray': '浅灰色背景 (#E9ECEF)',
+        'blue': '淡蓝色背景 (#E3F2FD 到 #BBDEFB 渐变)',
+        'black': '深灰色背景 (#343A40)',
+        'warm': '暖米色背景 (#FFF8E1 到 #FFECB3 渐变)'
+    }
+
     # 角度处理
     angle_map = {
         'front': '正面照，完全正对镜头',
@@ -396,7 +406,13 @@ def call_nanobanana_api(image_path, style, clothing, angle, background):
 
     # 构建文本 prompt
     angle_desc = angle_map.get(angle, '正面照，完全正对镜头')
-    bg_desc = background_map.get(background, '质感影棚背景，柔和自然光，背景略微虚化，营造专业氛围')
+
+    # 根据背景类型选择描述
+    if background == 'solid':
+        bg_desc = f"纯净{bg_color_map.get(bg_color, '纯白色')}背景，颜色均匀，无杂色"
+    else:
+        bg_desc = background_map.get(background, '质感影棚背景，柔和自然光，背景略微虚化，营造专业氛围')
+
     prompt_text = f"""美式专业职场风格肖像照，{angle_desc}半身肖像。
 
 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份。
@@ -551,7 +567,15 @@ def call_nanobanana_api(image_path, style, clothing, angle, background):
     # 背景颜色映射 (用于模拟模式)
     background_colors = {
         'textured': (128, 128, 128),  # 质感影棚 - 使用灰色
-        'solid': (245, 245, 245)      # 纯色背景 - 使用白色
+    }
+
+    # 纯色背景颜色映射
+    solid_bg_colors = {
+        'white': (255, 255, 255),
+        'gray': (233, 236, 239),
+        'blue': (187, 222, 251),
+        'black': (52, 58, 64),
+        'warm': (255, 236, 179)
     }
 
     try:
@@ -559,9 +583,14 @@ def call_nanobanana_api(image_path, style, clothing, angle, background):
         img = Image.open(image_path)
         img = img.convert('RGBA')
 
+        # 根据背景类型选择颜色
+        if background == 'solid':
+            bg_color_rgb = solid_bg_colors.get(bg_color, (255, 255, 255))
+        else:
+            bg_color_rgb = background_colors.get(background, (128, 128, 128))
+
         # 创建带背景的新图片
-        bg_color = background_colors.get(background, (128, 128, 128))
-        background_img = Image.new('RGBA', img.size, bg_color + (255,))
+        background_img = Image.new('RGBA', img.size, bg_color_rgb + (255,))
         background_img.paste(img, (0, 0), img)
         img = background_img.convert('RGB')
 
@@ -579,7 +608,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background):
         img.save(result_path, quality=95)
 
         print(f"[模拟模式] 图片已处理: {result_path}")
-        print(f"  风格: {style}, 服装: {clothing}, 背景: {background}")
+        bg_info = f"{background} ({bg_color})" if background == 'solid' else background
+        print(f"  风格: {style}, 服装: {clothing}, 背景: {bg_info}")
 
         return result_path
 
@@ -648,6 +678,7 @@ def upload():
     clothing = request.form.get('clothing', 'business_suit')
     angle = request.form.get('angle', 'front')
     background = request.form.get('background', 'textured')
+    bg_color = request.form.get('bgColor', 'white')  # 获取背景色，默认白色
 
     # 验证验证码
     result, error = verify_code(code)
@@ -674,7 +705,7 @@ def upload():
 
     # 调用 API 生成图片
     try:
-        result_path = call_nanobanana_api(filepath, style, clothing, angle, background)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color)
 
         # 扣减使用次数
         use_code(code)

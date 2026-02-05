@@ -648,6 +648,76 @@ body {
     color: #94a3b8;
 }
 
+/* 背景色选择器 */
+.color-options {
+    margin-top: 16px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.color-selector {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.color-option {
+    cursor: pointer;
+    flex: 1;
+    min-width: 70px;
+}
+
+.color-option input[type="radio"] {
+    display: none;
+}
+
+.color-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    background: white;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.color-card:hover {
+    border-color: #6366f1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.color-option input[type="radio"]:checked + .color-card {
+    border-color: #6366f1;
+    background: #f0f4ff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.color-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 4px;
+}
+
 /* 触摸设备反馈 */
 @media (hover: none) and (pointer: coarse) {
     .btn:active {

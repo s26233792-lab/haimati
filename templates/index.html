@@ -123,7 +123,7 @@
                         <label class="form-label">③ 选择背景</label>
                         <div class="background-selector">
                             <label class="background-option" data-bg="textured">
-                                <input type="radio" name="background" value="textured" checked>
+                                <input type="radio" name="background" value="textured" checked onchange="toggleColorOptions()">
                                 <div class="bg-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                                     <div class="bg-icon">✨</div>
                                     <div class="bg-name">质感影棚</div>
@@ -131,13 +131,50 @@
                                 </div>
                             </label>
                             <label class="background-option" data-bg="solid">
-                                <input type="radio" name="background" value="solid">
+                                <input type="radio" name="background" value="solid" onchange="toggleColorOptions()">
                                 <div class="bg-card" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
                                     <div class="bg-icon">🎨</div>
                                     <div class="bg-name">纯色背景</div>
                                     <div class="bg-desc">纯净纯色，简洁干净</div>
                                 </div>
                             </label>
+                        </div>
+
+                        <!-- 背景色选择（仅当选择纯色背景时显示） -->
+                        <div id="colorOptions" class="color-options" style="display: none;">
+                            <label class="form-label text-sm text-muted mb-2">选择背景色</label>
+                            <div class="color-selector">
+                                <label class="color-option">
+                                    <input type="radio" name="bgColor" value="white" checked>
+                                    <div class="color-card" style="background: #ffffff; border: 1px solid #dee2e6;">
+                                        <div class="color-name">白色</div>
+                                    </div>
+                                </label>
+                                <label class="color-option">
+                                    <input type="radio" name="bgColor" value="gray">
+                                    <div class="color-card" style="background: #e9ecef;">
+                                        <div class="color-name">灰色</div>
+                                    </div>
+                                </label>
+                                <label class="color-option">
+                                    <input type="radio" name="bgColor" value="blue">
+                                    <div class="color-card" style="background: linear-gradient(135deg, #e3f2fd, #bbdefb);">
+                                        <div class="color-name">蓝色</div>
+                                    </div>
+                                </label>
+                                <label class="color-option">
+                                    <input type="radio" name="bgColor" value="black">
+                                    <div class="color-card" style="background: #343a40;">
+                                        <div class="color-name">黑色</div>
+                                    </div>
+                                </label>
+                                <label class="color-option">
+                                    <input type="radio" name="bgColor" value="warm">
+                                    <div class="color-card" style="background: linear-gradient(135deg, #fff8e1, #ffecb3);">
+                                        <div class="color-name">暖色</div>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
