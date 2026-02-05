@@ -583,61 +583,6 @@ body {
     color: #94a3b8;
 }
 
-/* 美颜开关选择器 */
-.beautify-toggle {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-.toggle-option {
-    cursor: pointer;
-    flex: 1;
-    min-width: 140px;
-}
-
-.toggle-option input[type="radio"] {
-    display: none;
-}
-
-.toggle-card {
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
-    transition: all 0.3s ease;
-    background: white;
-}
-
-.toggle-option input[type="radio"]:checked + .toggle-card {
-    border-color: #6366f1;
-    background: #f0f4ff;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.toggle-card:hover {
-    border-color: #6366f1;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.toggle-icon {
-    font-size: 28px;
-    margin-bottom: 6px;
-}
-
-.toggle-name {
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 2px;
-    font-size: 14px;
-}
-
-.toggle-desc {
-    font-size: 11px;
-    color: #94a3b8;
-}
-
 /* 背景色选择器 */
 .color-options {
     margin-top: 16px;

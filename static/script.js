@@ -222,7 +222,7 @@ async function generatePortrait() {
     const angle = document.querySelector('input[name="angle"]:checked').value;
     const background = document.querySelector('input[name="background"]:checked').value;
     const bgColor = document.querySelector('input[name="bgColor"]:checked')?.value || 'white';
-    const beautify = document.querySelector('input[name="beautify"]:checked').value;
+    const beautify = 'yes';  // 默认启用轻微美颜
 
     // 显示进度，隐藏错误
     step2Error.style.display = 'none';
