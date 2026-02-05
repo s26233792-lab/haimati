@@ -33,61 +33,14 @@
     margin-bottom: 24px;
 }
 
-.comparison-card {
-    display: flex;
-    align-items: center;
-    gap: 20px;
+.comparison-svg {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
     background: #f8fafc;
     border-radius: 16px;
-    padding: 24px 32px;
+    padding: 16px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-}
-
-.comparison-side {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    min-width: 100px;
-}
-
-.comparison-before .comparison-avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #64748b;
-}
-
-.comparison-after .comparison-avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-}
-
-.comparison-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-}
-
-.comparison-desc {
-    font-size: 12px;
-    color: #64748b;
-}
-
-.comparison-arrow {
-    color: #8b5cf6;
-    display: flex;
-    align-items: center;
 }
 
 .showcase-features {
@@ -123,34 +76,8 @@
         font-size: 20px;
     }
 
-    .comparison-card {
-        padding: 20px;
-        gap: 12px;
-    }
-
-    .comparison-before .comparison-avatar,
-    .comparison-after .comparison-avatar {
-        width: 60px;
-        height: 60px;
-    }
-
-    .comparison-before .comparison-avatar svg,
-    .comparison-after .comparison-avatar svg {
-        width: 40px;
-        height: 40px;
-    }
-
-    .comparison-label {
-        font-size: 11px;
-    }
-
-    .comparison-desc {
-        font-size: 10px;
-    }
-
-    .comparison-arrow svg {
-        width: 24px;
-        height: 24px;
+    .comparison-svg {
+        max-width: 100%;
     }
 
     .showcase-features {

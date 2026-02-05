@@ -17,33 +17,47 @@
             </div>
             <!-- 效果对比展示 -->
             <div class="showcase-comparison-wrapper">
-                <div class="comparison-card">
-                    <div class="comparison-side comparison-before">
-                        <div class="comparison-avatar">
-                            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <circle cx="12" cy="8" r="3"/>
-                                <path d="M12 12c-4 0-6 2-6 4v1h12v-1c0-2-2-4-6-4z"/>
-                            </svg>
-                        </div>
-                        <div class="comparison-label">原图</div>
-                        <div class="comparison-desc">普通自拍</div>
-                    </div>
-                    <div class="comparison-arrow">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 12h14M12 5l7 7-7 7"/>
-                        </svg>
-                    </div>
-                    <div class="comparison-side comparison-after">
-                        <div class="comparison-avatar">
-                            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
-                                <circle cx="12" cy="8" r="3"/>
-                                <path d="M12 12c-4 0-6 2-6 4v1h12v-1c0-2-2-4-6-4z"/>
-                            </svg>
-                        </div>
-                        <div class="comparison-label">生成后</div>
-                        <div class="comparison-desc">专业肖像</div>
-                    </div>
-                </div>
+                <svg class="comparison-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="bgBefore" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#e2e8f0"/>
+                            <stop offset="100%" style="stop-color:#cbd5e1"/>
+                        </linearGradient>
+                        <linearGradient id="bgAfter" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#8b5cf6"/>
+                            <stop offset="100%" style="stop-color:#7c3aed"/>
+                        </linearGradient>
+                        <filter id="shadowAfter" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#7c3aed" flood-opacity="0.3"/>
+                        </filter>
+                    </defs>
+
+                    <!-- 左侧：原图 -->
+                    <rect x="20" y="20" width="170" height="160" rx="12" fill="url(#bgBefore)"/>
+                    <!-- 人物 - 原图 (普通) -->
+                    <circle cx="105" cy="75" r="28" fill="#94a3b8"/>
+                    <path d="M75 120 Q105 100 135 120 L135 150 Q105 160 75 150 Z" fill="#94a3b8"/>
+                    <text x="105" y="175" text-anchor="middle" fill="#64748b" font-size="12" font-weight="600">原图</text>
+                    <text x="105" y="190" text-anchor="middle" fill="#94a3b8" font-size="10">普通自拍</text>
+
+                    <!-- 箭头 -->
+                    <g transform="translate(200, 100)">
+                        <line x1="-15" y1="0" x2="15" y2="0" stroke="#8b5cf6" stroke-width="2"/>
+                        <polygon points="12,-5 22,0 12,5" fill="#8b5cf6"/>
+                    </g>
+
+                    <!-- 右侧：生成后 -->
+                    <rect x="210" y="20" width="170" height="160" rx="12" fill="url(#bgAfter)" filter="url(#shadowAfter)"/>
+                    <!-- 人物 - 生成后 (专业) -->
+                    <circle cx="295" cy="70" r="30" fill="#f0f4ff"/>
+                    <path d="M263 118 Q295 95 327 118 L327 155 Q295 168 263 155 Z" fill="#f0f4ff"/>
+                    <!-- 领子 -->
+                    <path d="M278 115 L295 135 L312 115" fill="white" stroke="#e0e7ff" stroke-width="1"/>
+                    <!-- 西装效果 -->
+                    <path d="M263 118 L263 155 Q295 168 327 155 L327 118" fill="#f0f4ff" stroke="white" stroke-width="1"/>
+                    <text x="295" y="175" text-anchor="middle" fill="white" font-size="12" font-weight="600">生成后</text>
+                    <text x="295" y="190" text-anchor="middle" fill="#e0e7ff" font-size="10">专业肖像</text>
+                </svg>
             </div>
             <div class="showcase-features">
                 <div class="feature-item">
