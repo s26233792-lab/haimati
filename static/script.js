@@ -8,10 +8,12 @@ let remainingCount = 0;
 // DOM 元素
 const codeInput = document.getElementById('codeInput');
 const codeError = document.getElementById('codeError');
+const verifyError = document.getElementById('verifyError');
 const step1 = document.getElementById('step1');
 const step2 = document.getElementById('step2');
 const step3 = document.getElementById('step3');
 const remainingCountSpan = document.getElementById('remainingCount');
+const step2Error = document.getElementById('step2Error');
 const fileInput = document.getElementById('fileInput');
 const uploadArea = document.getElementById('uploadArea');
 const uploadPlaceholder = document.getElementById('uploadPlaceholder');
@@ -25,6 +27,7 @@ const downloadLink = document.getElementById('downloadLink');
 codeInput.addEventListener('input', function() {
     this.value = this.value.toUpperCase();
     codeError.textContent = '';
+    verifyError.style.display = 'none';
 });
 
 // 验证码
@@ -36,13 +39,17 @@ async function verifyCode() {
         return;
     }
 
-    if (code.length < 6 || code.length > 10) {
-        codeError.textContent = '验证码应为6-10位';
+    if (code.length !== 8) {
+        codeError.textContent = '验证码应为8位';
         return;
     }
 
     try {
-        codeError.textContent = '验证中...';
+        // 显示验证中状态
+        verifyError.style.display = 'none';
+        const verifyBtn = document.getElementById('verifyBtn');
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = '验证中...';
 
         const response = await fetch('/api/verify', {
             method: 'POST',
@@ -60,18 +67,44 @@ async function verifyCode() {
             remainingCountSpan.textContent = remainingCount;
             showStep2();
         } else {
-            codeError.textContent = data.message;
+            verifyError.textContent = data.message;
+            verifyError.style.display = 'block';
         }
     } catch (error) {
-        codeError.textContent = '网络错误，请重试';
+        verifyError.textContent = '网络错误，请检查连接后重试';
+        verifyError.style.display = 'block';
         console.error(error);
+    } finally {
+        const verifyBtn = document.getElementById('verifyBtn');
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = '验证并开始';
     }
+}
+
+// 返回步骤1
+function backToStep1() {
+    step2.style.display = 'none';
+    step1.style.display = 'block';
+    codeInput.value = '';
+    codeError.textContent = '';
+    verifyError.style.display = 'none';
+    currentCode = '';
+    selectedFile = null;
+    remainingCount = 0;
 }
 
 // 显示步骤2
 function showStep2() {
     step1.style.display = 'none';
     step2.style.display = 'block';
+    step2Error.style.display = 'none';
+
+    // 检查剩余次数
+    if (remainingCount <= 0) {
+        step2Error.textContent = '⚠️ 此验证码的使用次数已用完，请更换验证码';
+        step2Error.style.display = 'block';
+        generateBtn.disabled = true;
+    }
 }
 
 // 返回步骤2
@@ -83,6 +116,7 @@ function resetToStep2() {
     previewImage.style.display = 'none';
     uploadPlaceholder.style.display = 'block';
     generateBtn.disabled = true;
+    step2Error.style.display = 'none';
 
     // 更新剩余次数
     fetch(`/api/status/${currentCode}`)
@@ -94,7 +128,8 @@ function resetToStep2() {
 
                 if (remainingCount <= 0) {
                     generateBtn.disabled = true;
-                    alert('您的使用次数已用完');
+                    step2Error.textContent = '⚠️ 此验证码的使用次数已用完，请更换验证码';
+                    step2Error.style.display = 'block';
                 }
             }
         });
@@ -131,15 +166,20 @@ function handleFile(file) {
     // 验证文件类型
     const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-        alert('只支持 PNG、JPG、WEBP 格式的图片');
+        step2Error.textContent = '⚠️ 只支持 PNG、JPG、WEBP 格式的图片';
+        step2Error.style.display = 'block';
         return;
     }
 
     // 验证文件大小 (16MB)
     if (file.size > 16 * 1024 * 1024) {
-        alert('图片大小不能超过16MB');
+        step2Error.textContent = '⚠️ 图片大小不能超过16MB';
+        step2Error.style.display = 'block';
         return;
     }
+
+    // 清除之前的错误信息
+    step2Error.style.display = 'none';
 
     selectedFile = file;
 
@@ -157,12 +197,14 @@ function handleFile(file) {
 // 生成肖像
 async function generatePortrait() {
     if (!selectedFile) {
-        alert('请先上传图片');
+        step2Error.textContent = '⚠️ 请先上传照片';
+        step2Error.style.display = 'block';
         return;
     }
 
     if (remainingCount <= 0) {
-        alert('您的使用次数已用完');
+        step2Error.textContent = '⚠️ 此验证码的使用次数已用完，请更换验证码';
+        step2Error.style.display = 'block';
         return;
     }
 
@@ -170,7 +212,8 @@ async function generatePortrait() {
     const clothing = document.getElementById('clothingSelect').value;
     const background = document.querySelector('input[name="background"]:checked').value;
 
-    // 显示进度
+    // 显示进度，隐藏错误
+    step2Error.style.display = 'none';
     generateBtn.disabled = true;
     progressArea.style.display = 'block';
 
@@ -206,11 +249,13 @@ async function generatePortrait() {
             step2.style.display = 'none';
             step3.style.display = 'block';
         } else {
-            alert(data.message || '生成失败，请重试');
+            step2Error.textContent = '⚠️ ' + (data.message || '生成失败，请重试');
+            step2Error.style.display = 'block';
             generateBtn.disabled = false;
         }
     } catch (error) {
-        alert('网络错误，请重试');
+        step2Error.textContent = '⚠️ 网络错误，请检查连接后重试';
+        step2Error.style.display = 'block';
         console.error(error);
         generateBtn.disabled = false;
     } finally {

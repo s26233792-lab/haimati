@@ -26,10 +26,11 @@
                     <div class="mb-3">
                         <label class="form-label">请输入验证码</label>
                         <input type="text" id="codeInput" class="form-control form-control-lg"
-                               placeholder="输入验证码" maxlength="10" style="text-transform: uppercase;">
+                               placeholder="输入8位验证码" maxlength="8" style="text-transform: uppercase;">
                         <div id="codeError" class="error-msg"></div>
                     </div>
-                    <button onclick="verifyCode()" class="btn btn-primary btn-lg w-100">
+                    <div id="verifyError" class="alert alert-danger" style="display: none;"></div>
+                    <button onclick="verifyCode()" class="btn btn-primary btn-lg w-100" id="verifyBtn">
                         验证并开始
                     </button>
                 </div>
@@ -40,10 +41,16 @@
                 <div class="step-header">
                     <span class="step-number">2</span>
                     <span class="step-title">选择配置</span>
-                    <span class="ms-auto remaining-badge">
-                        剩余次数: <span id="remainingCount">0</span> 次
-                    </span>
+                    <div class="ms-auto">
+                        <span class="remaining-badge me-2">
+                            剩余次数: <span id="remainingCount">0</span> 次
+                        </span>
+                        <button onclick="backToStep1()" class="btn btn-sm btn-outline-secondary">
+                            更换验证码
+                        </button>
+                    </div>
                 </div>
+                <div id="step2Error" class="alert alert-warning" style="display: none;"></div>
                 <div class="step-body">
                     <!-- 服装选择 -->
                     <div class="mb-4">
@@ -129,6 +136,9 @@
                 <div class="step-header">
                     <span class="step-number">3</span>
                     <span class="step-title">生成完成</span>
+                    <span class="ms-auto text-success">
+                        ✓ 生成成功
+                    </span>
                 </div>
                 <div class="step-body">
                     <div class="result-area">
