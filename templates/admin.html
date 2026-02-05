@@ -158,8 +158,8 @@
                 <button class="btn btn-success" onclick="copyAllNewCodes()">
                     <i class="bi bi-clipboard"></i> 复制所有新验证码
                 </button>
-                <button class="btn btn-info" onclick="generateShowcaseImage()">
-                    <i class="bi bi-image"></i> 生成展示对比图
+                <button class="btn btn-info" onclick="generateComparisonImage()">
+                    <i class="bi bi-magic"></i> 生成首页对比图
                 </button>
                 <a href="/admin/export_codes" class="btn btn-outline-success">
                     <i class="bi bi-download"></i> 导出验证码
@@ -725,8 +725,8 @@
             document.getElementById('genUses').addEventListener('input', updatePreview);
         });
 
-        // 生成展示对比图
-        async function generateShowcaseImage() {
+        // 生成首页对比图
+        async function generateComparisonImage() {
             if (!confirm('确定要生成展示对比图吗？这可能需要1-2分钟。')) return;
 
             const btn = event.target.closest('button');
@@ -735,7 +735,7 @@
             btn.disabled = true;
 
             try {
-                const response = await fetch('/admin/generate_showcase', { method: 'POST' });
+                const response = await fetch('/admin/generate_comparison_image', { method: 'POST' });
                 const data = await response.json();
 
                 if (data.success) {

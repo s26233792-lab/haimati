@@ -33,6 +33,16 @@
     margin-bottom: 24px;
 }
 
+.comparison-image {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
 .comparison-svg {
     width: 100%;
     max-width: 400px;

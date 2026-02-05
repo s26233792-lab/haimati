@@ -1005,6 +1005,80 @@ def batch_update_status():
     return jsonify({'success': True, 'updated': updated})
 
 
+@app.route('/admin/generate_comparison_image', methods=['POST'])
+@admin_required
+def generate_comparison_image():
+    """生成首页展示对比图（一次性使用）"""
+    import base64
+
+    prompt = """
+Create a side-by-side comparison image (400x200 pixels) showing the SAME Asian person's transformation:
+
+LEFT HALF (50%):
+- A professional but plain ID photo style
+- Person facing forward, neutral expression
+- Solid light gray background (#e5e7eb)
+- Wearing simple casual shirt
+- Flat lighting, no special effects
+- Text at bottom: "原图"
+
+RIGHT HALF (50%):
+- Same person in American professional portrait style
+- Confident expression, better posture
+- Purple gradient studio background (#8b5cf6 to #7c3aed)
+- Wearing business suit with visible collar
+- Professional studio lighting with subtle rim light
+- More vibrant and professional appearance
+- Text at bottom: "生成后"
+
+MIDDLE: A subtle arrow pointing from left to right
+"""
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7, "topK": 32, "topP": 0.95}
+    }
+
+    try:
+        request_url = f"{NANOBANANA_API_URL}?key={NANOBANANA_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(request_url, json=payload, headers=headers, timeout=180)
+
+        if response.status_code == 200:
+            result = response.json()
+
+            # 处理 Gemini 响应
+            if 'candidates' in result and len(result['candidates']) > 0:
+                candidate = result['candidates'][0]
+                if 'content' in candidate and 'parts' in candidate['content']:
+                    for part in candidate['content']['parts']:
+                        inline_data = part.get('inlineData') or part.get('inline_data')
+                        if inline_data and 'data' in inline_data:
+                            image_data = base64.b64decode(inline_data['data'])
+
+                            # 同时保存到两个位置
+                            static_path = 'static/images/showcase_comparison.png'
+                            upload_path = os.path.join(upload_folder, 'showcase_comparison.png')
+
+                            os.makedirs('static/images', exist_ok=True)
+                            with open(static_path, 'wb') as f:
+                                f.write(image_data)
+
+                            with open(upload_path, 'wb') as f:
+                                f.write(image_data)
+
+                            return jsonify({
+                                'success': True,
+                                'static_path': '/static/images/showcase_comparison.png',
+                                'upload_path': '/result/showcase_comparison.png'
+                            })
+
+        return jsonify({'success': False, 'message': f'生成失败: {response.status_code}'})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
 @app.route('/admin/generate_showcase', methods=['GET', 'POST'])
 @admin_required
 def generate_showcase():

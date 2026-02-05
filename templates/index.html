@@ -17,6 +17,11 @@
             </div>
             <!-- 效果对比展示 -->
             <div class="showcase-comparison-wrapper">
+                <img id="comparisonImage" class="comparison-image" src="/static/images/showcase_comparison.png"
+                     onerror="this.style.display='none'; document.getElementById('comparisonFallback').style.display='flex';"
+                     onload="this.style.display='block'; document.getElementById('comparisonFallback').style.display='none';"
+                     style="display: none;">
+                <div id="comparisonFallback" class="showcase-comparison-wrapper">
                 <svg class="comparison-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                         <linearGradient id="bgBefore" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -58,6 +63,7 @@
                     <text x="295" y="175" text-anchor="middle" fill="white" font-size="12" font-weight="600">生成后</text>
                     <text x="295" y="190" text-anchor="middle" fill="#e0e7ff" font-size="10">专业肖像</text>
                 </svg>
+                </div>
             </div>
             <div class="showcase-features">
                 <div class="feature-item">
