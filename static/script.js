@@ -247,6 +247,19 @@ async function generatePortrait() {
         });
 
         console.log('[API] 响应状态:', response.status);
+        console.log('[API] 响应类型:', response.headers.get('content-type'));
+
+        // 检查响应是否是 JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            // 服务器返回了 HTML 错误页面
+            const text = await response.text();
+            console.error('[API] 服务器返回非 JSON 响应:', text.substring(0, 500));
+            step2Error.textContent = '⚠️ 服务器错误，请联系管理员';
+            step2Error.style.display = 'block';
+            generateBtn.disabled = false;
+            return;
+        }
 
         const data = await response.json();
 
