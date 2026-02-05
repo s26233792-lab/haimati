@@ -480,9 +480,45 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 'Content-Type': 'application/json'
             }
 
-            response = requests.post(request_url, json=payload, headers=headers, timeout=120)
+            # 使用 Session 来处理连接池和重试
+            session = requests.Session()
+            session.mount('https://', requests.adapters.HTTPAdapter(
+                max_retries=3,
+                pool_connections=1,
+                pool_maxsize=1
+            ))
+
+            print(f"[API] 请求 URL: {api_url}")
+            print(f"[API] 请求超时: 120秒")
+
+            # 捕获所有可能的异常
+            try:
+                response = session.post(request_url, json=payload, headers=headers, timeout=120)
+            except requests.exceptions.Timeout as e:
+                print(f"[API] ❌ 请求超时: {e}")
+                last_api_call['error'] = f'请求超时（120秒）'
+                raise Exception(f"API 请求超时，请稍后重试")
+            except requests.exceptions.ConnectionError as e:
+                print(f"[API] ❌ 连接错误: {e}")
+                last_api_call['error'] = f'连接失败: {str(e)}'
+                raise Exception(f"无法连接到 API 服务器，请检查网络配置")
+            except (SystemExit, KeyboardInterrupt) as e:
+                print(f"[API] ❌ 进程退出: {e}")
+                last_api_call['error'] = f'进程意外退出'
+                raise Exception(f"API 调用被中断")
+            except Exception as e:
+                print(f"[API] ❌ 请求失败: {type(e).__name__}: {e}")
+                last_api_call['error'] = f'{type(e).__name__}: {str(e)}'
+                raise
 
             print(f"[API] 响应状态码: {response.status_code}")
+
+            # 检查 HTTP 状态码
+            if response.status_code != 200:
+                error_text = response.text[:500]
+                print(f"[API] HTTP 错误响应: {error_text}")
+                last_api_call['error'] = f'HTTP {response.status_code}: {error_text}'
+                raise Exception(f"API 返回错误 {response.status_code}: {error_text[:100]}")
 
             # 保存调试信息
             last_api_call['called'] = True
