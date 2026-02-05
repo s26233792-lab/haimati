@@ -389,13 +389,13 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         'solid': '纯净纯色背景，简洁干净，颜色均匀，无杂色'
     }
 
-    # 背景色处理（仅当选择 solid 时有效）
+    # 背景色处理（质感影棚和纯色背景都支持）
     bg_color_map = {
-        'white': '纯白色背景 (#FFFFFF)',
-        'gray': '浅灰色背景 (#E9ECEF)',
-        'blue': '淡蓝色背景 (#E3F2FD 到 #BBDEFB 渐变)',
-        'black': '深灰色背景 (#343A40)',
-        'warm': '暖米色背景 (#FFF8E1 到 #FFECB3 渐变)'
+        'white': '白色',
+        'gray': '灰色',
+        'blue': '蓝色',
+        'black': '深灰色',
+        'warm': '暖米色'
     }
 
     # 角度处理
@@ -406,12 +406,13 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
     # 构建文本 prompt
     angle_desc = angle_map.get(angle, '正面照，完全正对镜头')
+    color_desc = bg_color_map.get(bg_color, '白色')
 
     # 根据背景类型选择描述
     if background == 'solid':
-        bg_desc = f"纯净{bg_color_map.get(bg_color, '纯白色')}背景，颜色均匀，无杂色"
-    else:
-        bg_desc = background_map.get(background, '质感影棚背景，柔和自然光，背景略微虚化，营造专业氛围')
+        bg_desc = f"纯净{color_desc}背景，颜色均匀，无杂色"
+    else:  # textured
+        bg_desc = f"质感影棚背景，{color_desc}色调，柔和自然光，背景略微虚化，营造专业氛围"
 
     prompt_text = f"""美式专业职场风格肖像照，{angle_desc}半身肖像。
 
@@ -564,12 +565,16 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         'tshirt': '简约T恤'
     }
 
-    # 背景颜色映射 (用于模拟模式)
-    background_colors = {
-        'textured': (128, 128, 128),  # 质感影棚 - 使用灰色
+    # 背景颜色映射 (用于模拟模式，质感影棚和纯色都支持)
+    bg_color_map_sim = {
+        'white': (255, 255, 255),
+        'gray': (200, 200, 210),      # 质感影棚用稍浅的灰色
+        'blue': (180, 200, 230),       # 柔和的蓝色
+        'black': (70, 70, 80),         # 深灰色
+        'warm': (245, 235, 210)        # 暖米色
     }
 
-    # 纯色背景颜色映射
+    # 纯色背景使用更鲜艳的颜色
     solid_bg_colors = {
         'white': (255, 255, 255),
         'gray': (233, 236, 239),
@@ -586,8 +591,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         # 根据背景类型选择颜色
         if background == 'solid':
             bg_color_rgb = solid_bg_colors.get(bg_color, (255, 255, 255))
-        else:
-            bg_color_rgb = background_colors.get(background, (128, 128, 128))
+        else:  # textured
+            bg_color_rgb = bg_color_map_sim.get(bg_color, (200, 200, 210))
 
         # 创建带背景的新图片
         background_img = Image.new('RGBA', img.size, bg_color_rgb + (255,))
@@ -608,8 +613,9 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         img.save(result_path, quality=95)
 
         print(f"[模拟模式] 图片已处理: {result_path}")
-        bg_info = f"{background} ({bg_color})" if background == 'solid' else background
-        print(f"  风格: {style}, 服装: {clothing}, 背景: {bg_info}")
+        bg_type_text = '质感影棚' if background == 'textured' else '纯色背景'
+        bg_color_text = {'white': '白色', 'gray': '灰色', 'blue': '蓝色', 'black': '深灰', 'warm': '暖色'}.get(bg_color, '白色')
+        print(f"  风格: {style}, 服装: {clothing}, ���景: {bg_type_text}({bg_color_text})")
 
         return result_path
 

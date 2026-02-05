@@ -5,12 +5,12 @@ let currentCode = '';
 let selectedFile = null;
 let remainingCount = 0;
 
-// 切换背景色选项显示
-function toggleColorOptions() {
+// 更新背景色标签（根据背景类型显示不同文字）
+function updateColorLabel() {
     const background = document.querySelector('input[name="background"]:checked').value;
-    const colorOptions = document.getElementById('colorOptions');
-    if (colorOptions) {
-        colorOptions.style.display = (background === 'solid') ? 'block' : 'none';
+    const colorLabel = document.querySelector('#colorOptions .form-label');
+    if (colorLabel) {
+        colorLabel.textContent = background === 'solid' ? '选择纯色背景色' : '选择影棚色调';
     }
 }
 

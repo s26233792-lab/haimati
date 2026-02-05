@@ -123,7 +123,7 @@
                         <label class="form-label">③ 选择背景</label>
                         <div class="background-selector">
                             <label class="background-option" data-bg="textured">
-                                <input type="radio" name="background" value="textured" checked onchange="toggleColorOptions()">
+                                <input type="radio" name="background" value="textured" checked onchange="updateColorLabel()">
                                 <div class="bg-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                                     <div class="bg-icon">✨</div>
                                     <div class="bg-name">质感影棚</div>
@@ -131,7 +131,7 @@
                                 </div>
                             </label>
                             <label class="background-option" data-bg="solid">
-                                <input type="radio" name="background" value="solid" onchange="toggleColorOptions()">
+                                <input type="radio" name="background" value="solid" onchange="updateColorLabel()">
                                 <div class="bg-card" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
                                     <div class="bg-icon">🎨</div>
                                     <div class="bg-name">纯色背景</div>
@@ -140,8 +140,8 @@
                             </label>
                         </div>
 
-                        <!-- 背景色选择（仅当选择纯色背景时显示） -->
-                        <div id="colorOptions" class="color-options" style="display: none;">
+                        <!-- 背景色选择（始终显示） -->
+                        <div id="colorOptions" class="color-options" style="display: block;">
                             <label class="form-label text-sm text-muted mb-2">选择背景色</label>
                             <div class="color-selector">
                                 <label class="color-option">
