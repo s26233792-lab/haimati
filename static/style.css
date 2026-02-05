@@ -501,6 +501,17 @@ body {
     gap: 8px;
 }
 
+/* 质感影棚专用样式 - 更清晰的渐变 */
+.bg-card-textured {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%);
+}
+
+.bg-card-textured .bg-name,
+.bg-card-textured .bg-desc {
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 .bg-card:hover {
     border-color: var(--primary-color);
     transform: translateY(-2px);
@@ -511,6 +522,11 @@ body {
     border-color: var(--primary-color);
     background: #f0f4ff;
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.background-option input[type="radio"]:checked + .bg-card-textured {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+    border-color: #7c3aed;
 }
 
 .bg-icon {
