@@ -80,10 +80,29 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
 # 12ai.org 代理的 Gemini 图片生成 API
-NANOBANANA_API_MODEL = os.getenv('NANOBANANA_API_MODEL', 'gemini-3-pro-image-preview-2k')
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL',
-    f'https://cdn.12ai.org/v1beta/models/{NANOBANANA_API_MODEL}:generateContent')
+# 使用更可靠的端点配置
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
+
+# 支持多个模型选项
+MODEL_CONFIGS = {
+    'gemini-2.0-flash-exp': {
+        'url': 'https://cdn.12ai.org/v1beta/models/gemini-2.0-flash-exp:generateContent',
+        'name': 'Gemini 2.0 Flash (快速)'
+    },
+    'gemini-1.5-pro': {
+        'url': 'https://cdn.12ai.org/v1beta/models/gemini-1.5-pro-exp:generateContent',
+        'name': 'Gemini 1.5 Pro'
+    },
+    'gemini-3-pro-image-preview-2k': {
+        'url': 'https://cdn.12ai.org/v1beta/models/gemini-3-pro-image-preview-2k:generateContent',
+        'name': 'Gemini 3 Pro Image Preview'
+    }
+}
+
+# 从环境变量或默认值获取模型
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.0-flash-exp')
+model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-2.0-flash-exp'])
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', model_config['url'])
 
 # 管理后台认证配置
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -471,7 +490,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     # ==================== 打印 JSON 用于调试 ====================
     print(f"[API Request] Prompt:")
     print(prompt_text)
-    print(f"[API Request] 使用的模型: {NANOBANANA_API_MODEL}")
+    print(f"[API Request] 使用的模型: {MODEL_NAME}")
     print(f"[API Request] 请求的 URL: {NANOBANANA_API_URL}")
     print("-" * 60)
 
@@ -500,7 +519,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             ))
 
             print(f"[API] 请求 URL: {api_url}")
-            print(f"[API] 模型: {NANOBANANA_API_MODEL}")
+            print(f"[API] 模型: {MODEL_NAME}")
             print(f"[API] 请求超时: 120秒")
 
             # 捕获所有可能的异常
