@@ -93,25 +93,30 @@ API_BASE_URLS = {
     '12ai': 'https://cdn.12ai.org/v1'
 }
 
-# 支持多个模型选项
+# 支持多个模型选项 (laozhang.ai 支持的模型)
 MODEL_CONFIGS = {
-    'gemini-2.0-flash-exp': {
-        'name': 'Gemini 2.0 Flash (快速)',
-        'model_id': 'gemini-2.0-flash-exp'
+    'gemini-pro-vision': {
+        'name': 'Gemini Pro Vision (视觉专家)',
+        'model_id': 'gemini-pro-vision'
     },
-    'gemini-1.5-pro': {
-        'name': 'Gemini 1.5 Pro',
-        'model_id': 'gemini-1.5-pro-exp'
+    'gemini-1.5-pro-latest': {
+        'name': 'Gemini 1.5 Pro (旗舰)',
+        'model_id': 'gemini-1.5-pro-latest'
     },
-    'gemini-3-pro-image-preview-2k': {
-        'name': 'Gemini 3 Pro Image Preview',
-        'model_id': 'gemini-3-pro-image-preview-2k'
+    'gemini-1.5-flash-latest': {
+        'name': 'Gemini 1.5 Flash (高性价比)',
+        'model_id': 'gemini-1.5-flash-latest'
+    },
+    'gpt-4o': {
+        'name': 'GPT-4o (OpenAI)',
+        'model_id': 'gpt-4o'
     }
 }
 
 # 从环境变量或默认值获取模型
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
-model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-2.0-flash-exp'])
+# 默认使用 gemini-pro-vision，它是专门的图像理解模型
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-pro-vision')
+model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-pro-vision'])
 
 # 构建完整的 API URL (使用 OpenAI 兼容的 chat/completions 端点)
 base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['laozhang'])
