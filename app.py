@@ -84,7 +84,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 
 # API 提供商选择
-API_PROVIDER = os.getenv('API_PROVIDER', 'laozhang')  # 'laozhang' 或 '12ai'
+API_PROVIDER = os.getenv('API_PROVIDER', '12ai')  # 'laozhang' 或 '12ai'
 
 # API 基础 URL 配置
 # laozhang.ai 使用 OpenAI 兼容格式
@@ -93,8 +93,12 @@ API_BASE_URLS = {
     '12ai': 'https://cdn.12ai.org/v1'
 }
 
-# 支持多个模型选项 (laozhang.ai 支持的模型)
+# 支持多个模型选项 (12ai.org 支持的图像生成模型)
 MODEL_CONFIGS = {
+    'gemini-3-pro-image-preview-2k': {
+        'name': 'Gemini 3 Pro Image Preview 2K (12ai 推荐)',
+        'model_id': 'gemini-3-pro-image-preview-2k'
+    },
     'gemini-2.0-flash-exp': {
         'name': 'Gemini 2.0 Flash Exp (图像生成)',
         'model_id': 'gemini-2.0-flash-exp'
@@ -103,10 +107,6 @@ MODEL_CONFIGS = {
         'name': 'Gemini 1.5 Pro (旗舰)',
         'model_id': 'gemini-1.5-pro-latest'
     },
-    'gemini-1.5-flash-latest': {
-        'name': 'Gemini 1.5 Flash (高性价比)',
-        'model_id': 'gemini-1.5-flash-latest'
-    },
     'gpt-4o': {
         'name': 'GPT-4o (OpenAI)',
         'model_id': 'gpt-4o'
@@ -114,14 +114,24 @@ MODEL_CONFIGS = {
 }
 
 # 从环境变量或默认值获取模型
-# 默认使用 gemini-2.0-flash-exp，支持图像生成
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.0-flash-exp')
-model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-pro-vision'])
+# 默认使用 gemini-3-pro-image-preview-2k (12ai 图像生成模型)
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
+model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview-2k'])
 
-# 构建完整的 API URL (使用 OpenAI 兼容的 chat/completions 端点)
-base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['laozhang'])
-# laozhang.ai 使用 OpenAI 兼容格式，端点是 /v1/chat/completions
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', f"{base_url}/chat/completions")
+# 构建完整的 API URL
+base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
+
+# 检测是否是 Gemini 模型（用于图像生成）
+is_gemini_model = MODEL_NAME.startswith('gemini-')
+
+if is_gemini_model and API_PROVIDER == '12ai':
+    # Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
+    NANOBANANA_API_URL = f"{base_url}/models/{MODEL_NAME}:generateContent"
+    API_FORMAT = 'gemini'
+else:
+    # 其他模型使用 OpenAI 兼容格式: /v1/chat/completions
+    NANOBANANA_API_URL = f"{base_url}/chat/completions"
+    API_FORMAT = 'openai'
 
 # 管理后台认证配置
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -502,47 +512,60 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     print(prompt_text)
     print("=" * 70)
 
-    # ==================== 构建请求 payload (OpenAI 兼容格式) ====================
-    # laozhang.ai 使用 OpenAI 兼容的消息格式
+    # ==================== 构建请求 payload ====================
     # 添加随机种子以确保每次生成不同的图片
     import time
     random_seed = int(time.time() * 1000) % 1000000
-
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt_text
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_data}"
-                        }
-                    }
-                ]
-            }
-        ],
-        "temperature": 0.9,  # 提高温度以增加随机性
-        "top_p": 0.95,
-        "seed": random_seed,  # 添加随机种子
-        "max_tokens": 4096
-    }
-
     print(f"[API] 使用随机种子: {random_seed}")
+
+    # 根据模型类型选择不同的请求格式
+    if API_FORMAT == 'gemini':
+        # Gemini 原生格式 (用于 12ai Gemini 模型)
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt_text},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                ]
+            }],
+            "generationConfig": {
+                "temperature": 0.9,
+                "topP": 0.95,
+                "responseModalities": ["IMAGE"],
+                "imageFormat": "PNG"
+            }
+        }
+        api_format_name = "Gemini 原生格式"
+        payload_type = "Gemini contents/parts 格式"
+    else:
+        # OpenAI 兼容格式
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_text},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                    ]
+                }
+            ],
+            "temperature": 0.9,
+            "top_p": 0.95,
+            "seed": random_seed,
+            "max_tokens": 4096
+        }
+        api_format_name = "OpenAI 兼容格式"
+        payload_type = "OpenAI chat/completions 格式"
 
     # ==================== 打印发送给 API 的数据 ====================
     print("=" * 70)
-    print("🚀 发送给 API 的数据 (OpenAI 兼容格式):")
+    print(f"🚀 发送给 API 的数据 ({api_format_name}):")
     print(f"  URL: {NANOBANANA_API_URL}")
     print(f"  模型: {MODEL_NAME}")
     print(f"  Prompt 长度: {len(prompt_text)} 字符")
     print(f"  图片数据大小: {len(image_data)} 字符 (base64)")
-    print(f"  Payload 结构: OpenAI chat/completions 格式")
+    print(f"  Payload 结构: {payload_type}")
     print("-" * 70)
     print("📤 Prompt 内容 (发送给 API):")
     print(prompt_text)
@@ -555,14 +578,14 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     # 检查 API Key 是否配置
     if api_key:
         print(f"[API] ==================== API 配置 ====================")
-        print(f"[API] API 提供商: {API_PROVIDER} (OpenAI 兼容格式)")
+        print(f"[API] API 提供商: {API_PROVIDER}")
+        print(f"[API] API 格式: {API_FORMAT.upper()}")
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
         print(f"[API] 模型: {MODEL_NAME}")
         print(f"[API] API URL: {api_url}")
         print(f"[API] ================================================")
         try:
-            print(f"[API] 开始调用 API (OpenAI 兼容格式)...")
-            # OpenAI 兼容格式使用 Authorization header
+            print(f"[API] 开始调用 API ({API_FORMAT.upper()} 格式)...")
             headers = {
                 'Content-Type': 'application/json',
                 'Authorization': f'Bearer {api_key}'
