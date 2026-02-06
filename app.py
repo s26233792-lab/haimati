@@ -95,9 +95,9 @@ API_BASE_URLS = {
 
 # 支持多个模型选项 (laozhang.ai 支持的模型)
 MODEL_CONFIGS = {
-    'gemini-pro-vision': {
-        'name': 'Gemini Pro Vision (视觉专家)',
-        'model_id': 'gemini-pro-vision'
+    'gemini-2.0-flash-exp': {
+        'name': 'Gemini 2.0 Flash Exp (图像生成)',
+        'model_id': 'gemini-2.0-flash-exp'
     },
     'gemini-1.5-pro-latest': {
         'name': 'Gemini 1.5 Pro (旗舰)',
@@ -114,8 +114,8 @@ MODEL_CONFIGS = {
 }
 
 # 从环境变量或默认值获取模型
-# 默认使用 gemini-pro-vision，它是专门的图像理解模型
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-pro-vision')
+# 默认使用 gemini-2.0-flash-exp，支持图像生成
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.0-flash-exp')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-pro-vision'])
 
 # 构建完整的 API URL (使用 OpenAI 兼容的 chat/completions 端点)
@@ -504,6 +504,10 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
     # ==================== 构建请求 payload (OpenAI 兼容格式) ====================
     # laozhang.ai 使用 OpenAI 兼容的消息格式
+    # 添加随机种子以确保每次生成不同的图片
+    import time
+    random_seed = int(time.time() * 1000) % 1000000
+
     payload = {
         "model": MODEL_NAME,
         "messages": [
@@ -523,9 +527,13 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 ]
             }
         ],
-        "temperature": 0.4,
+        "temperature": 0.9,  # 提高温度以增加随机性
+        "top_p": 0.95,
+        "seed": random_seed,  # 添加随机种子
         "max_tokens": 4096
     }
+
+    print(f"[API] 使用随机种子: {random_seed}")
 
     # ==================== 打印发送给 API 的数据 ====================
     print("=" * 70)
