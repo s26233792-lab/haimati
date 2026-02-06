@@ -79,36 +79,60 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
-# 12ai.org 代理的 Gemini 图片生成 API
+# 支持多个 API 提供商: laozhang.ai, 12ai.org
 # 使用更可靠的端点配置
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
+
+# API 提供商选择
+API_PROVIDER = os.getenv('API_PROVIDER', 'laozhang')  # 'laozhang' 或 '12ai'
+
+# API 基础 URL 配置
+API_BASE_URLS = {
+    'laozhang': 'https://api.laozhang.ai/v1beta/models',
+    '12ai': 'https://cdn.12ai.org/v1beta/models'
+}
 
 # 支持多个模型选项
 MODEL_CONFIGS = {
     'gemini-2.0-flash-exp': {
-        'url': 'https://cdn.12ai.org/v1beta/models/gemini-2.0-flash-exp:generateContent',
-        'name': 'Gemini 2.0 Flash (快速)'
+        'name': 'Gemini 2.0 Flash (快速)',
+        'model_path': 'gemini-2.0-flash-exp:generateContent'
     },
     'gemini-1.5-pro': {
-        'url': 'https://cdn.12ai.org/v1beta/models/gemini-1.5-pro-exp:generateContent',
-        'name': 'Gemini 1.5 Pro'
+        'name': 'Gemini 1.5 Pro',
+        'model_path': 'gemini-1.5-pro-exp:generateContent'
     },
     'gemini-3-pro-image-preview-2k': {
-        'url': 'https://cdn.12ai.org/v1beta/models/gemini-3-pro-image-preview-2k:generateContent',
-        'name': 'Gemini 3 Pro Image Preview'
+        'name': 'Gemini 3 Pro Image Preview',
+        'model_path': 'gemini-3-pro-image-preview-2k:generateContent'
     }
 }
 
 # 从环境变量或默认值获取模型
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.0-flash-exp')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-2.0-flash-exp'])
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', model_config['url'])
+
+# 构建完整的 API URL
+base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['laozhang'])
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', f"{base_url}/{model_config['model_path']}")
 
 # 管理后台认证配置
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+
+# ==================== 启动时打印配置信息 ====================
+print("=" * 70)
+print("🚀 肖像照生成服务启动中...")
+print("=" * 70)
+print(f"📡 API 提供商: {API_PROVIDER}")
+print(f"🤖 使用模型: {MODEL_NAME} ({model_config['name']})")
+print(f"🔗 API URL: {NANOBANANA_API_URL}")
+print(f"🔑 API Key: {'已配置 (' + str(len(NANOBANANA_API_KEY)) + ' 字符)' if NANOBANANA_API_KEY else '❌ 未配置'}")
+print(f"💾 数据库类型: {'PostgreSQL' if POSTGRES_AVAILABLE else 'SQLite'}")
+print(f"📁 上传目录: {upload_folder}")
+print("=" * 70)
 
 from functools import wraps
 
@@ -498,10 +522,14 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     api_key = os.getenv('NANOBANANA_API_KEY', '')
     api_url = NANOBANANA_API_URL
 
-    # 检查 API Key 是否配置
+    # 检查 API Key 是否配��
     if api_key:
+        print(f"[API] ==================== API 配置 ====================")
+        print(f"[API] API 提供商: {API_PROVIDER}")
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
+        print(f"[API] 模型: {MODEL_NAME}")
         print(f"[API] API URL: {api_url}")
+        print(f"[API] ================================================")
         try:
             print(f"[API] 开始调用 Gemini API...")
             # Gemini API 使用 URL 参数传递 key
