@@ -98,9 +98,13 @@ API_BASE_URLS = {
 
 # 支持多个模型选项 (12ai.org 支持的图像生成模型)
 MODEL_CONFIGS = {
-    'gemini-3-pro-image-preview-2k': {
-        'name': 'Gemini 3 Pro Image Preview 2K (12ai 推荐)',
-        'model_id': 'gemini-3-pro-image-preview-2k'
+    'gemini-3-pro-image-preview': {
+        'name': 'Gemini 3 Pro Image Preview (12ai 推荐)',
+        'model_id': 'gemini-3-pro-image-preview'
+    },
+    'gemini-3-pro-image-preview': {
+        'name': 'Gemini 3 Pro Image Preview 2K',
+        'model_id': 'gemini-3-pro-image-preview'
     },
     'gemini-2.0-flash-exp': {
         'name': 'Gemini 2.0 Flash Exp (图像生成)',
@@ -117,9 +121,9 @@ MODEL_CONFIGS = {
 }
 
 # 从环境变量或默认值获取模型
-# 默认使用 gemini-3-pro-image-preview-2k (12ai 图像生成模型)
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
-model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview-2k'])
+# 默认使用 gemini-3-pro-image-preview (12ai 图像生成模型)
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview')
+model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview'])
 
 # 构建完整的 API URL
 base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
