@@ -58,6 +58,7 @@ else:
 os.makedirs(upload_folder, exist_ok=True)
 
 # PostgreSQL 支持
+POSTGRES_AVAILABLE = False
 if db_type == 'postgresql':
     try:
         import psycopg2
@@ -66,10 +67,12 @@ if db_type == 'postgresql':
     except ImportError:
         print("警告: psycopg2 未安装，将回退到 SQLite")
         db_type = 'sqlite'
-        db_config = 'codes.db'
-        POSTGRES_AVAILABLE = False
-else:
-    POSTGRES_AVAILABLE = False
+        # 使用持久化路径（Railway环境）或本地路径
+        if is_railway:
+            db_config = os.path.join(persistent_path, 'codes.db')
+            os.makedirs(persistent_path, exist_ok=True)
+        else:
+            db_config = 'codes.db'
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = upload_folder
@@ -371,7 +374,16 @@ def verify_code(code):
     if not result:
         return None, "验证码不存在"
 
-    max_uses, used_count, status = result
+    # 兼容多种数据库返回格式（元组、Row对象、字典）
+    if isinstance(result, dict):
+        max_uses = result['max_uses']
+        used_count = result['used_count']
+        status = result['status']
+    else:
+        # 元组或Row对象，按索引访问
+        max_uses = result[0]
+        used_count = result[1]
+        status = result[2]
 
     if status != 'active':
         return None, "验证码已失效"
@@ -483,21 +495,25 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     else:  # textured
         bg_desc = f"质感影棚背景，{color_desc}色调，柔和自然光，背景略微虚化，营造专业氛围"
 
-    prompt_text = f"""美式专业职场风格肖像照，{'微微倾斜角度拍摄' if angle == 'slight_tilt' else '正面角度拍摄'}。
+    prompt_text = f"""【重要】你必须生成一张全新的图片，绝对��能返回原图！请根据上传的照片重新绘制，改变服装、背景和光影，但保持人物面部特征完全一致。
+
+美式专业职场风格肖像照，{'微微倾斜角度拍摄' if angle == 'slight_tilt' else '正面角度拍摄'}。
 
 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份。
 
 皮肤处理：{beauty_desc}。
 
-服装：{clothing_map.get(clothing, '商务西装')}。
+服装：{clothing_map.get(clothing, '商务西装')}。请为人物穿上相应的服装。
 
-背景：{bg_desc}。
+背景：{bg_desc}。请替换背景。
 
 姿态：如军人般挺拔，强调宽肩{'，身体微微侧转，面部正对镜头' if angle == 'slight_tilt' else '，完全正对镜头'}。
 
 画质：超高清，4K分辨率，清晰对焦，肤色真实自然，构图干净优雅，保留所有细节。
 
-画面尺寸：3:4，输出最高质量的图片，分辨率不低于 2048x2730 像素。"""
+画面尺寸：3:4，输出最高质量的图片，分辨率不低于 2048x2730 像素。
+
+【再次强调】必须生成全新的图片，原图仅供参考。生成的图片应该有明显的变化（服装、背景、光影都不同），但人物面部必须保持一致。"""
 
     # ==================== 打印调试信息 ====================
     print("=" * 70)
@@ -686,6 +702,13 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                                     print(f"[API] 原图大小: {original_size} bytes")
                                     print(f"[API] 生成图片大小: {len(image_data)} bytes")
 
+                                    # 检查是否和原图大小相同（可能返回了原图）
+                                    if abs(len(image_data) - original_size) < 100:
+                                        print(f"[API] ❌ 错误: 生成图片大小与原图几乎相同！")
+                                        print(f"[API] ❌ API 返回了原图而不是生成的新图片")
+                                        last_api_call['error'] = 'API返回了原图而非生成的图片'
+                                        raise Exception("API返回了原图，图片生成失败。请尝试调整prompt或更换模型。")
+
                                     with open(result_path, 'wb') as f:
                                         f.write(image_data)
 
@@ -722,8 +745,10 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
                                     # 检查是否和原图大小相同（可能返回了原图）
                                     if abs(len(image_data) - original_size) < 100:
-                                        print(f"[API] ⚠️ 警告: 生成图片大小与原图几乎相同！")
-                                        print(f"[API] ⚠️ 可能 API 返回了原图而不是生成的新图片")
+                                        print(f"[API] ❌ 错误: 生成图片大小与原图几乎相同！")
+                                        print(f"[API] ❌ API 返回了原图而不是生成的新图片")
+                                        last_api_call['error'] = 'API返回了原图而非生成的图片'
+                                        raise Exception("API返回了原图，图片生成失败。请尝试调整prompt或更换模型。")
 
                                     with open(result_path, 'wb') as f:
                                         f.write(image_data)
