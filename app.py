@@ -31,6 +31,10 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 # Railway 环境检测 - 使用 PostgreSQL 或 SQLite
 is_railway = os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_VOLUME_PATH')
+
+# 持久化存储路径（Railway Volume 或本地）
+persistent_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '/data')
+
 if is_railway:
     # Railway 环境：优先使用 PostgreSQL，否则使用持久化 SQLite
     if DATABASE_URL:
@@ -38,21 +42,19 @@ if is_railway:
         db_type = 'postgresql'
         db_config = DATABASE_URL
     else:
-        # 没有配置 PostgreSQL，使用本地 SQLite（数据会丢失，不推荐）
+        # 使用持久化存储的 SQLite（Railway Volume）
         db_type = 'sqlite'
-        db_config = '/tmp/portrait_app/codes.db'
-        os.makedirs('/tmp/portrait_app', exist_ok=True)
+        db_config = os.path.join(persistent_path, 'codes.db')
+        os.makedirs(persistent_path, exist_ok=True)
+
+    # 上传目录也使用持久化存储
+    upload_folder = os.path.join(persistent_path, 'uploads')
 else:
     # 本地开发环境：使用 SQLite
     db_type = 'sqlite'
     db_config = 'codes.db'
-
-# 上传目录配置
-if is_railway:
-    # Railway 环境：使用临时目录（图片在重启后会丢失）
-    upload_folder = '/tmp/portrait_app/uploads'
-else:
     upload_folder = os.getenv('UPLOAD_FOLDER', 'uploads')
+
 os.makedirs(upload_folder, exist_ok=True)
 
 # PostgreSQL 支持
