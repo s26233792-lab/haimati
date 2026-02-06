@@ -87,24 +87,25 @@ NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 API_PROVIDER = os.getenv('API_PROVIDER', 'laozhang')  # 'laozhang' 或 '12ai'
 
 # API 基础 URL 配置
+# laozhang.ai 使用 OpenAI 兼容格式
 API_BASE_URLS = {
-    'laozhang': 'https://api.laozhang.ai/v1beta/models',
-    '12ai': 'https://cdn.12ai.org/v1beta/models'
+    'laozhang': 'https://api.laozhang.ai/v1',
+    '12ai': 'https://cdn.12ai.org/v1'
 }
 
 # 支持多个模型选项
 MODEL_CONFIGS = {
     'gemini-2.0-flash-exp': {
         'name': 'Gemini 2.0 Flash (快速)',
-        'model_path': 'gemini-2.0-flash-exp:generateContent'
+        'model_id': 'gemini-2.0-flash-exp'
     },
     'gemini-1.5-pro': {
         'name': 'Gemini 1.5 Pro',
-        'model_path': 'gemini-1.5-pro-exp:generateContent'
+        'model_id': 'gemini-1.5-pro-exp'
     },
     'gemini-3-pro-image-preview-2k': {
         'name': 'Gemini 3 Pro Image Preview',
-        'model_path': 'gemini-3-pro-image-preview-2k:generateContent'
+        'model_id': 'gemini-3-pro-image-preview-2k'
     }
 }
 
@@ -112,9 +113,10 @@ MODEL_CONFIGS = {
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-2.0-flash-exp'])
 
-# 构建完整的 API URL
+# 构建完整的 API URL (使用 OpenAI 兼容的 chat/completions 端点)
 base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['laozhang'])
-NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', f"{base_url}/{model_config['model_path']}")
+# laozhang.ai 使用 OpenAI 兼容格式，端点是 /v1/chat/completions
+NANOBANANA_API_URL = os.getenv('NANOBANANA_API_URL', f"{base_url}/chat/completions")
 
 # 管理后台认证配置
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -495,35 +497,39 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     print(prompt_text)
     print("=" * 70)
 
-    # ==================== 构建请求 payload (Gemini 格式) ====================
+    # ==================== 构建请求 payload (OpenAI 兼容格式) ====================
+    # laozhang.ai 使用 OpenAI 兼容的消息格式
     payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt_text},
-                {
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": image_data
+        "model": MODEL_NAME,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt_text
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_data}"
+                        }
                     }
-                }
-            ]
-        }],
-        "generationConfig": {
-            "temperature": 0.4,
-            "topK": 32,
-            "topP": 0.95,
-            "candidateCount": 1
-        }
+                ]
+            }
+        ],
+        "temperature": 0.4,
+        "max_tokens": 4096
     }
 
     # ==================== 打印发送给 API 的数据 ====================
     print("=" * 70)
-    print("🚀 发送给 API 的数据:")
+    print("🚀 发送给 API 的数据 (OpenAI 兼容格式):")
     print(f"  URL: {NANOBANANA_API_URL}")
     print(f"  模型: {MODEL_NAME}")
     print(f"  Prompt 长度: {len(prompt_text)} 字符")
     print(f"  图片数据大小: {len(image_data)} 字符 (base64)")
-    print(f"  Payload 结构: {json.dumps({'contents': [{'parts': ['text (省略)', 'inline_data (图片)']}]}, ensure_ascii=False)}")
+    print(f"  Payload 结构: OpenAI chat/completions 格式")
     print("-" * 70)
     print("📤 Prompt 内容 (发送给 API):")
     print(prompt_text)
@@ -533,20 +539,20 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     api_key = os.getenv('NANOBANANA_API_KEY', '')
     api_url = NANOBANANA_API_URL
 
-    # 检查 API Key 是否配��
+    # 检查 API Key 是否配置
     if api_key:
         print(f"[API] ==================== API 配置 ====================")
-        print(f"[API] API 提供商: {API_PROVIDER}")
+        print(f"[API] API 提供商: {API_PROVIDER} (OpenAI 兼容格式)")
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
         print(f"[API] 模型: {MODEL_NAME}")
         print(f"[API] API URL: {api_url}")
         print(f"[API] ================================================")
         try:
-            print(f"[API] 开始调用 Gemini API...")
-            # Gemini API 使用 URL 参数传递 key
-            request_url = f"{api_url}?key={api_key}"
+            print(f"[API] 开始调用 API (OpenAI 兼容格式)...")
+            # OpenAI 兼容格式使用 Authorization header
             headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
             }
 
             # 使用 Session 来处理连接池和重试
@@ -560,13 +566,18 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             print(f"[API] 请求 URL: {api_url}")
             print(f"[API] 模型: {MODEL_NAME}")
             print(f"[API] 请求超时: 120秒")
-            # 确认 payload 中的 prompt
-            payload_prompt = payload.get('contents', [{}])[0].get('parts', [{}])[0].get('text', '')
-            print(f"[API] ✅ Payload 中的 Prompt: {payload_prompt[:50]}... (长度: {len(payload_prompt)})")
+            # 确认 payload 中的 prompt (OpenAI 格式)
+            payload_content = payload.get('messages', [{}])[0].get('content', [])
+            if isinstance(payload_content, list):
+                for item in payload_content:
+                    if item.get('type') == 'text':
+                        prompt_text_check = item.get('text', '')
+                        print(f"[API] ✅ Payload 中的 Prompt: {prompt_text_check[:50]}... (长度: {len(prompt_text_check)})")
+                        break
 
             # 捕获所有可能的异常
             try:
-                response = session.post(request_url, json=payload, headers=headers, timeout=120)
+                response = session.post(api_url, json=payload, headers=headers, timeout=120)
             except requests.exceptions.Timeout as e:
                 print(f"[API] ❌ 请求超时: {e}")
                 last_api_call['error'] = f'请求超时（120秒）'
@@ -608,7 +619,49 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 last_api_call['response_keys'] = list(result.keys())
                 last_api_call['error'] = None
 
-                # ========== 处理 Gemini API 响应格式 ==========
+                # ========== 处理 OpenAI 兼容响应格式 ==========
+                # OpenAI 格式: {"choices": [{"message": {"content": "..."}}]}
+                if 'choices' in result and len(result['choices']) > 0:
+                    choice = result['choices'][0]
+                    print(f"[API] 检测到 OpenAI 格式响应")
+                    print(f"[API] Choice 数据: {list(choice.keys())}")
+                    if 'message' in choice:
+                        message = choice['message']
+                        print(f"[API] Message 数据存在: True")
+                        if 'content' in message:
+                            content = message['content']
+                            print(f"[API] Content 类型: {type(content)}")
+
+                            # 检查 content 是否包含图片数据
+                            if isinstance(content, str):
+                                print(f"[API] Content 长度: {len(content)}")
+                                print(f"[API] Content 预览: {content[:200]}...")
+
+                                # 检查是否是 base64 编码的图片 (data:image/...;base64,...)
+                                if content.startswith('data:image') and 'base64' in content:
+                                    import base64
+                                    # 提取 base64 数据
+                                    base64_data = content.split('base64,')[-1]
+                                    image_data = base64.b64decode(base64_data)
+                                    result_path = image_path.replace('.', '_result.')
+
+                                    # 检查图片大小
+                                    original_size = os.path.getsize(image_path)
+                                    print(f"[API] 原图大小: {original_size} bytes")
+                                    print(f"[API] 生成图片大小: {len(image_data)} bytes")
+
+                                    with open(result_path, 'wb') as f:
+                                        f.write(image_data)
+
+                                    saved_size = os.path.getsize(result_path)
+                                    print(f"[API] 保存后大小: {saved_size} bytes")
+
+                                    print(f"[API] ✓ OpenAI 图片生成成功: {result_path}")
+                                    last_api_call['success'] = True
+                                    last_api_call['format'] = 'openai_base64'
+                                    return result_path
+
+                # ========== 处理 Gemini API 响应格式 (向后兼容) ==========
                 # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
                 if 'candidates' in result and len(result['candidates']) > 0:
                     candidate = result['candidates'][0]
