@@ -220,16 +220,24 @@
                     </span>
                 </div>
                 <div class="step-body">
+                    <!-- 保存提醒 -->
+                    <div class="save-reminder">
+                        <div class="reminder-icon">💾</div>
+                        <div class="reminder-text">
+                            <strong>请务必保存图片！</strong>
+                            <br><small>刷新页面后将无法找回，建议立即下载到本地</small>
+                        </div>
+                    </div>
                     <div class="result-area">
                         <img id="resultImage" class="result-image" src="" alt="生成的肖像">
                     </div>
                     <div class="d-grid gap-2">
                         <a id="downloadLink" href="" download="portrait.png"
                            class="btn btn-success btn-lg">
-                            下载图片
+                            💾 立即下载图片
                         </a>
                         <button onclick="resetToStep2()" class="btn btn-outline-primary">
-                            再生成一张
+                            🔄 再生成一张
                         </button>
                     </div>
                 </div>

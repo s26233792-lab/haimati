@@ -99,6 +99,42 @@
     }
 }
 
+/* 保存提醒 */
+.save-reminder {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+}
+
+.reminder-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.reminder-text {
+    flex: 1;
+}
+
+.reminder-text strong {
+    color: #856404;
+    font-size: 16px;
+}
+
+.reminder-text small {
+    color: #924600;
+}
+
 :root {
     --primary-color: #6366f1;
     --primary-hover: #4f46e5;
