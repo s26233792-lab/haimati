@@ -516,12 +516,18 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         }
     }
 
-    # ==================== 打印 JSON 用于调试 ====================
-    print(f"[API Request] Prompt:")
+    # ==================== 打印发送给 API 的数据 ====================
+    print("=" * 70)
+    print("🚀 发送给 API 的数据:")
+    print(f"  URL: {NANOBANANA_API_URL}")
+    print(f"  模型: {MODEL_NAME}")
+    print(f"  Prompt 长度: {len(prompt_text)} 字符")
+    print(f"  图片数据大小: {len(image_data)} 字符 (base64)")
+    print(f"  Payload 结构: {json.dumps({'contents': [{'parts': ['text (省略)', 'inline_data (图片)']}]}, ensure_ascii=False)}")
+    print("-" * 70)
+    print("📤 Prompt 内容 (发送给 API):")
     print(prompt_text)
-    print(f"[API Request] 使用的模型: {MODEL_NAME}")
-    print(f"[API Request] 请求的 URL: {NANOBANANA_API_URL}")
-    print("-" * 60)
+    print("=" * 70)
 
     # ========== 真实 API 调用部分 ==========
     api_key = os.getenv('NANOBANANA_API_KEY', '')
@@ -554,6 +560,9 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             print(f"[API] 请求 URL: {api_url}")
             print(f"[API] 模型: {MODEL_NAME}")
             print(f"[API] 请求超时: 120秒")
+            # 确认 payload 中的 prompt
+            payload_prompt = payload.get('contents', [{}])[0].get('parts', [{}])[0].get('text', '')
+            print(f"[API] ✅ Payload 中的 Prompt: {payload_prompt[:50]}... (长度: {len(payload_prompt)})")
 
             # 捕获所有可能的异常
             try:
