@@ -109,7 +109,7 @@ MODEL_CONFIGS = {
 }
 
 # 从环境变量或默认值获取模型
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-2.0-flash-exp')
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-2.0-flash-exp'])
 
 # 构建完整的 API URL
