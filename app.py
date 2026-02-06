@@ -466,7 +466,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     else:  # textured
         bg_desc = f"质感影棚背景，{color_desc}色调，柔和自然光，背景略微虚化，营造专业氛围"
 
-    prompt_text = f"""美式专业职场风格肖像照，{angle_desc}半身肖像。
+    prompt_text = f"""美式专业职场风格肖像照，{'微微倾斜角度拍摄' if angle == 'slight_tilt' else '正面角度拍摄'}。
 
 人物特征：100%还原原始五官特征，保留原始发型，严格保持原始身份。
 
@@ -476,19 +476,24 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
 背景：{bg_desc}。
 
-姿态：如军人般挺拔，强调宽肩{', ' + angle_desc if angle == 'slight_tilt' else '，完全正对镜头'}。
+姿态：如军人般挺拔，强调宽肩{'，身体微微侧转，面部正对镜头' if angle == 'slight_tilt' else '，完全正对镜头'}。
 
-画质：超高清，4K分辨率，清晰对焦，肤色真实自然，构图干净优雅{'，微微倾斜镜头' if angle == 'slight_tilt' else ''}，保留所有细节。
+画质：超高清，4K分辨率，清晰对焦，肤色真实自然，构图干净优雅，保留所有细节。
 
 画面尺寸：3:4，输出最高质量的图片，分辨率不低于 2048x2730 像素。"""
 
     # ==================== 打印调试信息 ====================
-    print(f"[Prompt] 服装: {clothing} -> {clothing_map.get(clothing, '商务西装')}")
-    print(f"[Prompt] 角度: {angle} -> {angle_desc}")
-    print(f"[Prompt] 背景: {background} + {bg_color} -> {bg_desc}")
-    print(f"[Prompt] 美颜: {beautify} -> {beauty_desc}")
-    print(f"[Prompt] 完整 Prompt:\n{prompt_text}")
-    print("=" * 60)
+    print("=" * 70)
+    print("📋 生成参数:")
+    print(f"  服装: {clothing} -> {clothing_map.get(clothing, '商务西装')}")
+    print(f"  角度: {angle} -> {angle_desc}")
+    print(f"  背景: {background} + {bg_color}")
+    print(f"  背景描述: {bg_desc}")
+    print(f"  美颜: {beautify}")
+    print("=" * 70)
+    print("📝 完整 Prompt:")
+    print(prompt_text)
+    print("=" * 70)
 
     # ==================== 构建请求 payload (Gemini 格式) ====================
     payload = {
