@@ -135,9 +135,6 @@ MODEL_CONFIGS = {
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview'])
 
-# Prompt语言设置：'zh' 中文, 'en' 英文（Instructional Prompting）
-PROMPT_LANGUAGE = os.getenv('PROMPT_LANGUAGE', 'zh')  # 默认中文
-
 # 构建完整的 API URL
 base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['apicore'])
 
@@ -172,7 +169,6 @@ print(f"🔗 API URL: {NANOBANANA_API_URL}")
 print(f"🔑 API Key: {'已配置 (' + str(len(NANOBANANA_API_KEY)) + ' 字符)' if NANOBANANA_API_KEY else '❌ 未配置'}")
 print(f"💾 数据库类型: {'PostgreSQL' if POSTGRES_AVAILABLE else 'SQLite'}")
 print(f"📁 上传目录: {upload_folder}")
-print(f"🌐 Prompt语言: {'英文 (Instructional Prompting)' if PROMPT_LANGUAGE == 'en' else '中文'} (环境变量: PROMPT_LANGUAGE)")
 print("=" * 70)
 
 from functools import wraps
@@ -567,94 +563,6 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     print(prompt_text)
     print("=" * 70)
 
-    # ==================== 生成英文Instructional Prompting（可选） ====================
-    if PROMPT_LANGUAGE == 'en':
-        # 服装映射（英文）
-        clothing_en = {
-            'business_suit': 'professional business suit',
-            'formal_dress': 'formal dress attire',
-            'casual_shirt': 'casual button-down shirt',
-            'turtleneck': 'elegant turtleneck sweater',
-            'tshirt': 'simple minimalist t-shirt',
-        }
-
-        # 背景映射（英文）
-        background_en_map = {
-            'textured': f'textured studio background in {color_desc} tones, soft professional lighting, subtle bokeh',
-            'solid': f'clean solid {color_desc} background, uniform and minimal'
-        }
-
-        # 美颜映射（英文）
-        beautify_en = {
-            'yes': 'SUBTLE BEAUTIFICATION: natural skin brightening, refined texture, maintain realistic proportions',
-            'no': 'NO RETOUCHING: preserve authentic appearance without enhancements'
-        }
-
-        # 角度映射（英文）
-        angle_en = {
-            'front': 'front-facing, looking directly at camera',
-            'slight_tilt': 'slight tilt angle, body slightly turned, face forward'
-        }
-
-        bg_desc_en = background_en_map.get(background, background_en_map['textured'])
-        angle_desc_en = angle_en.get(angle, angle_en['front'])
-        beautify_desc_en = beautify_en.get(beautify, beautify_en['no'])
-        clothing_desc_en = clothing_en.get(clothing, clothing_en['business_suit'])
-
-        # 生成英文Instructional Prompt
-        prompt_text = f"""GENERATE A PROFESSIONAL PORTRAIT PHOTO USING THE FOLLOWING INSTRUCTIONS:
-
-TASK: Image-to-Image Transformation
-Create a new professional portrait by changing clothing and background while preserving facial identity.
-
-SUBJECT REQUIREMENTS:
-- MAINTAIN exact facial features and hairstyle from reference
-- PRESERVE gender and age characteristics
-- OPTIMIZE skin tone lighting for professional look
-- {beautify_desc_en}
-
-CLOTHING INSTRUCTIONS:
-- DRESS subject in {clothing_desc_en}
-- ENSURE proper fit with natural draping
-- CREATE realistic appearance with appropriate textures
-
-BACKGROUND INSTRUCTIONS:
-- REPLACE original background completely
-- USE {bg_desc_en}
-- MAINTAIN clean and professional aesthetic
-
-COMPOSITION AND STYLE:
-- COMPOSE professional American-style portrait
-- POSITION subject in {angle_desc_en}
-- DIRECT subject to stand tall with military-grade posture
-- SET ultra-high 2K resolution with sharp focus
-- FRAME at 3:4 aspect ratio (2048x2730 pixels)
-- LIGHT with studio-grade lighting setup
-- CREATE elegant and balanced composition
-
-CRITICAL CONSTRAINTS:
-- DO NOT return the original image
-- DO NOT apply simple filters or color adjustments
-- MUST generate a completely new image
-- MUST visibly differ from original: different clothing, background, lighting
-
-QUALITY VERIFICATION:
-Generated image MUST show clear differences:
-1. Different clothing ({clothing_desc_en})
-2. Different background ({bg_desc_en})
-3. Professional studio-quality lighting
-
-TECHNICAL SPECIFICATIONS:
-- Resolution: 2048x2730 pixels (2K)
-- Aspect Ratio: 3:4
-- Format: Portrait photography
-- Style: Professional corporate headshot
-- Strength: 0.75 (high transformation)"""
-
-        print("=" * 70)
-        print("🌍 Using English Instructional Prompting")
-        print("=" * 70)
-
     # ==================== 构建请求 payload ====================
     # 添加随机种子以确保每次生成不同的图片
     import time
@@ -700,12 +608,16 @@ TECHNICAL SPECIFICATIONS:
             "top_p": 0.95,
             "seed": random_seed,
             "max_tokens": 4096,
-            # 修复：将参数直接放在payload根级别（不使用extra_body）
-            "strength": 0.75,  # 重绘幅度：0.0-1.0，越高变化越大
-            "guidance_scale": 7.5,  # 引导强度：控制对prompt的遵循程度
+            # 添加重绘幅度参数（关键修复！）
+            # 注意：不同的API提供商可能使用不同的参数名
+            "extra_body": {
+                "strength": 0.75,  # 重绘幅度：0.0-1.0，越高变化越大
+                "guidance_scale": 7.5,  # 引导强度：控制对prompt的遵循程度
+                "image_guidance_scale": 1.5  # 图像引导强度：控制对原图的保留程度
+            }
         }
         api_format_name = "OpenAI 兼容格式"
-        payload_type = "OpenAI chat/completions 格式（strength在根级别）"
+        payload_type = "OpenAI chat/completions 格式"
 
     # ==================== 打印发送给 API 的数据 ====================
     print("=" * 70)
@@ -716,18 +628,6 @@ TECHNICAL SPECIFICATIONS:
     print(f"  图片数据大小: {len(image_data)} 字符 (base64)")
     print(f"  Payload 结构: {payload_type}")
     print("-" * 70)
-
-    # 验证payload中的关键参数
-    if API_FORMAT != 'gemini':
-        print("[验证] Payload关键参数:")
-        print(f"  - strength: {payload.get('strength', '未设置')} ❗")
-        print(f"  - guidance_scale: {payload.get('guidance_scale', '未设置')}")
-        print(f"  - temperature: {payload.get('temperature')}")
-        print(f"  - seed: {payload.get('seed')}")
-        if 'strength' not in payload:
-            print("  ⚠️ 警告: strength参数未设置，可能导致返回原图！")
-        print("-" * 70)
-
     print("📤 Prompt 内容 (发送给 API):")
     print(prompt_text)
     print("=" * 70)
@@ -872,7 +772,7 @@ TECHNICAL SPECIFICATIONS:
                                     print(f"[API] ✓ OpenAI 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'openai_base64'
-                                    return result_path, True  # API成功生成
+                                    return result_path
 
                 # ========== 处理 Gemini API 响应格式 (向后兼容) ==========
                 # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
@@ -914,7 +814,7 @@ TECHNICAL SPECIFICATIONS:
                                     print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'gemini'
-                                    return result_path, True  # API成功生成
+                                    return result_path
                                 else:
                                     print(f"[API] Part {i} 没有 inlineData")
                         else:
@@ -933,7 +833,7 @@ TECHNICAL SPECIFICATIONS:
                     print(f"[API] ✓ 图片生成成功 (base64格式): {result_path}")
                     last_api_call['success'] = True
                     last_api_call['format'] = 'base64'
-                    return result_path, True  # API成功生成
+                    return result_path
 
                 # 格式2: {"url": "https://..."}
                 elif 'url' in result:
@@ -945,7 +845,7 @@ TECHNICAL SPECIFICATIONS:
                         print(f"[API] ✓ 图片下载成功 (URL格式): {result_path}")
                         last_api_call['success'] = True
                         last_api_call['format'] = 'url'
-                        return result_path, True  # API成功生��
+                        return result_path
                     else:
                         print(f"[API] 下载图片失败: {img_response.status_code}")
                         last_api_call['error'] = f'下载失败: {img_response.status_code}'
@@ -1034,11 +934,11 @@ TECHNICAL SPECIFICATIONS:
         beauty_text = '轻微美颜' if beautify == 'yes' else '无美颜'
         print(f"  风格: {style}, 服装: {clothing}, 背景: {bg_type_text}({bg_color_text}), 美颜: {beauty_text}")
 
-        return result_path, False  # 模拟模式，API未成功生成
+        return result_path
 
     except Exception as e:
         print(f"图片处理失败: {e}")
-        return image_path, False  # 失败时返回原图
+        return image_path  # 失败时返回原图
 
 
 # ==================== 路由 ====================
@@ -1132,19 +1032,12 @@ def upload():
         print(f"[Upload] 开始处理上传: {filename}")
         print(f"[Upload] 配置: style={style}, clothing={clothing}, angle={angle}, bg={background}, color={bg_color}, beautify={beautify}")
 
-        result_path, api_success = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
 
-        print(f"[Upload] API 调用完成: {result_path}")
-        print(f"[Upload] API成功标志: {api_success}")
+        print(f"[Upload] API 调用成功: {result_path}")
 
-        # 只有API真正成功生成时才扣减使用次数
-        if api_success:
-            print(f"[Upload] API成功生成，扣减验证码次数")
-            use_code(code)
-            remaining_count = result['remaining'] - 1
-        else:
-            print(f"[Upload] API失败或使用模拟模式，不扣减验证码次数")
-            remaining_count = result['remaining']
+        # 扣减使用次数
+        use_code(code)
 
         # 记录日志（包含IP和用户代理）
         log_generation(code, f"{style}_{clothing}_{background}", filename, result_path, client_ip, user_agent)
@@ -1152,7 +1045,7 @@ def upload():
         return jsonify({
             'success': True,
             'result_url': f'/result/{result_path.split("/")[-1]}',
-            'remaining': remaining_count
+            'remaining': result['remaining'] - 1
         })
 
     except Exception as e:
@@ -1281,11 +1174,8 @@ def debug_health():
     try:
         conn = get_db_connection()
         c = get_db_cursor(conn)
-
-        if db_type == 'sqlite':
-            c.execute('SELECT name FROM sqlite_master WHERE type="table"')
-        else:
-            c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+        c.execute('SELECT name FROM sqlite_master WHERE type="table"') if db_type == 'sqlite' else \
+                c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
 
         tables = [row[0] for row in c.fetchall()]
         health_status['checks']['tables'] = {
@@ -1327,27 +1217,11 @@ def status(code):
     logs = c.fetchall()
     conn.close()
 
-    # 兼容多种数据库返回格式（字典或元组）
-    history = []
-    for row in logs:
-        if isinstance(row, dict):
-            history.append({
-                'style': row['style'],
-                'time': row['created_at'],
-                'result': row['result_image']
-            })
-        else:
-            history.append({
-                'style': row[0],
-                'time': row[1],
-                'result': row[2]
-            })
-
     return jsonify({
         'success': True,
         'remaining': result['remaining'],
         'max_uses': result['max_uses'],
-        'history': history
+        'history': [{'style': row[0], 'time': row[1], 'result': row[2]} for row in logs]
     })
 
 
@@ -1489,11 +1363,7 @@ def export_security_logs():
     output = io.StringIO()
     output.write("验证码,IP地址,是否成功,失败原因,时间\n")
     for log in logs:
-        # 兼容字典和元组格式
-        if isinstance(log, dict):
-            output.write(f"{log.get('code', '') or ''},{log.get('ip_address', '') or ''},{log.get('success', False)},{log.get('failure_reason', '') or ''},{log.get('created_at', '')}\n")
-        else:
-            output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
+        output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
 
     from flask import Response
     return Response(

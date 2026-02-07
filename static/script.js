@@ -222,7 +222,11 @@ async function generatePortrait() {
     const angle = document.querySelector('input[name="angle"]:checked').value;
     const background = document.querySelector('input[name="background"]:checked').value;
     const bgColor = document.querySelector('input[name="bgColor"]:checked')?.value || 'white';
-    const beautify = 'yes';  // 默认启用轻微美颜
+    // 从美颜开关读取值
+    const beautifyCheckbox = document.getElementById('beautifyCheckbox');
+    const beautify = beautifyCheckbox.checked ? 'yes' : 'no';
+
+    console.log('[配置] 服装:', clothing, '角度:', angle, '背景:', background, '颜色:', bgColor, '美颜:', beautify);
 
     // 显示进度，隐藏错误
     step2Error.style.display = 'none';
