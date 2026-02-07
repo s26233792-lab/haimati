@@ -772,7 +772,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                                     print(f"[API] ✓ OpenAI 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'openai_base64'
-                                    return result_path, True  # API成功生成
+                                    return result_path
 
                 # ========== 处理 Gemini API 响应格式 (向后兼容) ==========
                 # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
@@ -814,7 +814,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                                     print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'gemini'
-                                    return result_path, True  # API成功生成
+                                    return result_path
                                 else:
                                     print(f"[API] Part {i} 没有 inlineData")
                         else:
@@ -833,7 +833,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                     print(f"[API] ✓ 图片生成成功 (base64格式): {result_path}")
                     last_api_call['success'] = True
                     last_api_call['format'] = 'base64'
-                    return result_path, True  # API成功生成
+                    return result_path
 
                 # 格式2: {"url": "https://..."}
                 elif 'url' in result:
@@ -845,7 +845,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                         print(f"[API] ✓ 图片下载成功 (URL格式): {result_path}")
                         last_api_call['success'] = True
                         last_api_call['format'] = 'url'
-                        return result_path, True  # API成功生��
+                        return result_path
                     else:
                         print(f"[API] 下载图片失败: {img_response.status_code}")
                         last_api_call['error'] = f'下载失败: {img_response.status_code}'
@@ -934,11 +934,11 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         beauty_text = '轻微美颜' if beautify == 'yes' else '无美颜'
         print(f"  风格: {style}, 服装: {clothing}, 背景: {bg_type_text}({bg_color_text}), 美颜: {beauty_text}")
 
-        return result_path, False  # 模拟模式，API未成功生成
+        return result_path
 
     except Exception as e:
         print(f"图片处理失败: {e}")
-        return image_path, False  # 失败时返回原图
+        return image_path  # 失败时返回原图
 
 
 # ==================== 路由 ====================
@@ -1032,19 +1032,12 @@ def upload():
         print(f"[Upload] 开始处理上传: {filename}")
         print(f"[Upload] 配置: style={style}, clothing={clothing}, angle={angle}, bg={background}, color={bg_color}, beautify={beautify}")
 
-        result_path, api_success = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
 
-        print(f"[Upload] API 调用完成: {result_path}")
-        print(f"[Upload] API成功标志: {api_success}")
+        print(f"[Upload] API 调用成功: {result_path}")
 
-        # 只有API真正成功生成时才扣减使用次数
-        if api_success:
-            print(f"[Upload] API成功生成，扣减验证码次数")
-            use_code(code)
-            remaining_count = result['remaining'] - 1
-        else:
-            print(f"[Upload] API失败或使用模拟模式，不扣减验证码次数")
-            remaining_count = result['remaining']
+        # 扣减使用次数
+        use_code(code)
 
         # 记录日志（包含IP和用户代理）
         log_generation(code, f"{style}_{clothing}_{background}", filename, result_path, client_ip, user_agent)
@@ -1052,7 +1045,7 @@ def upload():
         return jsonify({
             'success': True,
             'result_url': f'/result/{result_path.split("/")[-1]}',
-            'remaining': remaining_count
+            'remaining': result['remaining'] - 1
         })
 
     except Exception as e:
