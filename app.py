@@ -609,6 +609,11 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     api_key = os.getenv('NANOBANANA_API_KEY', '')
     api_url = NANOBANANA_API_URL
 
+    # 记录 API 调用开始
+    last_api_call['called'] = True
+    last_api_call['url'] = api_url
+    last_api_call['timestamp'] = datetime.now().isoformat()
+
     # 检查 API Key 是否配置
     if api_key:
         print(f"[API] ==================== API 配置 ====================")
@@ -651,18 +656,22 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             except requests.exceptions.Timeout as e:
                 print(f"[API] ❌ 请求超时: {e}")
                 last_api_call['error'] = f'请求超时（120秒）'
+                last_api_call['status_code'] = 408
                 raise Exception(f"API 请求超时，请稍后重试")
             except requests.exceptions.ConnectionError as e:
                 print(f"[API] ❌ 连接错误: {e}")
                 last_api_call['error'] = f'连接失败: {str(e)}'
+                last_api_call['status_code'] = 503
                 raise Exception(f"无法连接到 API 服务器，请检查网络配置")
             except (SystemExit, KeyboardInterrupt) as e:
                 print(f"[API] ❌ 进程退出: {e}")
                 last_api_call['error'] = f'进程意外退出'
+                last_api_call['status_code'] = 500
                 raise Exception(f"API 调用被中断")
             except Exception as e:
                 print(f"[API] ❌ 请求失败: {type(e).__name__}: {e}")
                 last_api_call['error'] = f'{type(e).__name__}: {str(e)}'
+                last_api_call['status_code'] = 500
                 raise
 
             print(f"[API] 响应状态码: {response.status_code}")
