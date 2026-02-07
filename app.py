@@ -74,6 +74,10 @@ if db_type == 'postgresql':
         else:
             db_config = 'codes.db'
 
+# SQL 占位符配置（兼容 PostgreSQL 和 SQLite）
+# PostgreSQL 使用 %s，SQLite 使用 ?
+PLACEHOLDER = '%s' if db_type == 'postgresql' else '?'
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = upload_folder
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB max file size
@@ -367,7 +371,7 @@ def verify_code(code):
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    c.execute('SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
+    c.execute(f'SELECT max_uses, used_count, status FROM verification_codes WHERE code = {PLACEHOLDER}', (code,))
     result = c.fetchone()
     conn.close()
 
@@ -399,7 +403,7 @@ def use_code(code):
     """使用验证码（扣减次数）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
+    c.execute(f'UPDATE verification_codes SET used_count = used_count + 1 WHERE code = {PLACEHOLDER}', (code,))
     conn.commit()
     conn.close()
 
@@ -408,9 +412,9 @@ def log_generation(code, style, original_image, result_image, ip_address=None, u
     """记录生成历史（包含IP和用户代理）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('''
+    c.execute(f'''
         INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
     ''', (code, style, original_image, result_image, ip_address, user_agent))
     conn.commit()
     conn.close()
@@ -420,9 +424,9 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
     """记录验证尝试（用于安全审计）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('''
+    c.execute(f'''
         INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
-        VALUES (?, ?, ?, ?)
+        VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
     ''', (code, ip_address, success, failure_reason))
     conn.commit()
     conn.close()
@@ -1088,10 +1092,10 @@ def status(code):
     # 获取生成历史
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('''
+    c.execute(f'''
         SELECT style, created_at, result_image
         FROM generation_logs
-        WHERE code = ?
+        WHERE code = {PLACEHOLDER}
         ORDER BY created_at DESC
     ''', (code,))
     logs = c.fetchall()
@@ -1188,9 +1192,9 @@ def admin_generate_codes():
     for _ in range(count):
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         try:
-            c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
+            c.execute(f'INSERT INTO verification_codes (code, max_uses) VALUES ({PLACEHOLDER}, {PLACEHOLDER})', (code, max_uses))
             codes.append(code)
-        except sqlite3.IntegrityError:
+        except Exception:
             continue
 
     conn.commit()
@@ -1205,7 +1209,7 @@ def export_codes():
     """导出所有活跃验证码"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('SELECT code FROM verification_codes WHERE status = "active" ORDER BY code')
+    c.execute(f'SELECT code FROM verification_codes WHERE status = {PLACEHOLDER} ORDER BY code', ('active',))
     codes = [row[0] for row in c.fetchall()]
     conn.close()
 
@@ -1267,7 +1271,7 @@ def batch_delete():
     c = get_db_cursor(conn)
 
     # 使用占位符构建IN查询
-    placeholders = ','.join(['?' for _ in codes])
+    placeholders = ','.join([PLACEHOLDER for _ in codes])
     c.execute(f'DELETE FROM verification_codes WHERE code IN ({placeholders})', codes)
 
     deleted = c.rowcount
@@ -1294,8 +1298,8 @@ def batch_update_status():
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    placeholders = ','.join(['?' for _ in codes])
-    c.execute(f'UPDATE verification_codes SET status = ? WHERE code IN ({placeholders})', [status] + codes)
+    placeholders = ','.join([PLACEHOLDER for _ in codes])
+    c.execute(f'UPDATE verification_codes SET status = {PLACEHOLDER} WHERE code IN ({placeholders})', [status] + codes)
 
     updated = c.rowcount
     conn.commit()
@@ -1317,7 +1321,7 @@ def reset_code():
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    c.execute('UPDATE verification_codes SET used_count = 0, status = "active" WHERE code = ?', (code,))
+    c.execute(f'UPDATE verification_codes SET used_count = 0, status = {PLACEHOLDER} WHERE code = {PLACEHOLDER}', ('active', code))
 
     if c.rowcount == 0:
         conn.close()
