@@ -1082,6 +1082,86 @@ def debug_api():
     return jsonify(last_api_call)
 
 
+@app.route('/debug/health')
+def debug_health():
+    """健康检查端点 - 全面检查系统状态"""
+    health_status = {
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'checks': {}
+    }
+
+    # 1. 数据库连接检查
+    try:
+        conn = get_db_connection()
+        c = get_db_cursor(conn)
+        if db_type == 'postgresql':
+            c.execute('SELECT version()')
+            version = c.fetchone()[0]
+            health_status['checks']['database'] = {
+                'status': 'ok',
+                'type': 'PostgreSQL',
+                'version': version[:50]
+            }
+        else:
+            c.execute('SELECT sqlite_version()')
+            version = c.fetchone()[0]
+            health_status['checks']['database'] = {
+                'status': 'ok',
+                'type': 'SQLite',
+                'version': version
+            }
+        conn.close()
+    except Exception as e:
+        health_status['checks']['database'] = {
+            'status': 'error',
+            'error': str(e)
+        }
+        health_status['status'] = 'unhealthy'
+
+    # 2. API Key 检查
+    api_key = os.getenv('NANOBANANA_API_KEY', '')
+    health_status['checks']['api_key'] = {
+        'status': 'configured' if api_key else 'missing',
+        'length': len(api_key) if api_key else 0
+    }
+
+    # 3. 上传目录检查
+    upload_exists = os.path.exists(upload_folder)
+    health_status['checks']['upload_folder'] = {
+        'status': 'ok' if upload_exists else 'warning',
+        'path': upload_folder,
+        'exists': upload_exists
+    }
+
+    # 4. 数据库表检查
+    try:
+        conn = get_db_connection()
+        c = get_db_cursor(conn)
+        c.execute('SELECT name FROM sqlite_master WHERE type="table"') if db_type == 'sqlite' else \
+                c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+
+        tables = [row[0] for row in c.fetchall()]
+        health_status['checks']['tables'] = {
+            'status': 'ok',
+            'count': len(tables),
+            'tables': tables
+        }
+        conn.close()
+    except Exception as e:
+        health_status['checks']['tables'] = {
+            'status': 'error',
+            'error': str(e)
+        }
+
+    # 5. 最后一次 API 调用状态
+    health_status['checks']['last_api_call'] = last_api_call
+
+    # 确定整体状态
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return jsonify(health_status), status_code
+
+
 @app.route('/api/status/<code>')
 def status(code):
     """获取验证码状态"""
