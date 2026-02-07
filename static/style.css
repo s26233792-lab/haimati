@@ -742,3 +742,77 @@ body {
         margin-bottom: 1rem !important;
     }
 }
+
+/* ==================== 美颜开关样式 ==================== */
+.beautify-option {
+    margin-top: 12px;
+}
+
+.beautify-toggle {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.beautify-toggle:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.beautify-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.beautify-slider {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    background: #cbd5e1;
+    border-radius: 14px;
+    margin-right: 16px;
+    transition: background 0.3s ease;
+}
+
+.beautify-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 24px;
+    height: 24px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.beautify-toggle input:checked + .beautify-slider {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.beautify-toggle input:checked + .beautify-slider::before {
+    transform: translateX(24px);
+}
+
+.beautify-label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.beautify-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.beautify-desc {
+    font-size: 13px;
+    color: #64748b;
+}
