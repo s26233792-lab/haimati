@@ -167,6 +167,52 @@ mount_to = "/data"
 
 ---
 
+### 问题 5: Application failed to respond
+
+**症状**：
+- 上传图片后显示 "⚠️ Application failed to respond"
+- 没有收到任何错误消息
+- Railway 日志显示 worker 超时
+
+**原因**：
+- gunicorn 默认超时时间为 30 秒
+- API 调用可能需要 120 秒
+- 时间不匹配导致 gunicorn 提前终止工作进程
+
+**解决方案**：
+
+**已修复**：✅ Procfile 已更新，增加超时时间
+
+```bash
+# 新的 Procfile 配置
+web: gunicorn app:app --timeout 150 --workers 2 --bind 0.0.0.0:$PORT
+```
+
+**验证**：
+
+1. Railway 会自动重新部署
+2. 等待部署完成后重新测试
+3. 查看日志确认没有超时错误
+
+---
+
+### 问题 6: 占位符不兼容
+
+**症状**：
+- PostgreSQL 环境报错
+- 提示 "syntax error at or near"
+
+**已修复**：✅ 代码已更新为自动适配 PostgreSQL 和 SQLite
+
+**验证**：
+
+```bash
+/debug/config
+查看 db_type 和 postgres_available
+```
+
+---
+
 ## 手动测试步骤
 
 ### 测试 1: 验证码验证
@@ -281,6 +327,7 @@ curl -X POST https://your-project.railway.app/api/upload \
 ## 更新日志
 
 ### 2026-02-07
+- ✅ **修复 gunicorn 超时问题** - 增加 timeout 到 150 秒，解决 "Application failed to respond" 错误
 - ✅ 修复 PostgreSQL/SQLite 占位符兼容性问题
 - ✅ 添加健康检查端点 `/debug/health`
 - ✅ 改进错误日志输出
