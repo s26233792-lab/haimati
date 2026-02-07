@@ -20,7 +20,7 @@
 | 配置项 | 当前值 |
 |--------|--------|
 | **API 提供商** | ismaque.org |
-| **模型名称** | `gemini-3-pro-image-preview` |
+| **模型名称** | `gemini-3-pro-image-preview-2k` |
 | **API 格式** | Gemini 原生格式 |
 | **输出分辨率** | **2K** (2048x2730 像素) |
 | **画面比例** | 3:4 |
@@ -28,7 +28,7 @@
 ### API 端点
 
 ```
-https://ismaque.org/v1/models/gemini-3-pro-image-preview:generateContent
+https://ismaque.org/v1/models/gemini-3-pro-image-preview-2k:generateContent
 ```
 
 ---
@@ -47,7 +47,7 @@ https://ismaque.org/v1/models/gemini-3-pro-image-preview:generateContent
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `API_PROVIDER` | `12ai` | API 提供商 (12ai/laozhang) |
-| `MODEL_NAME` | `gemini-3-pro-image-preview` | 模型名称 |
+| `MODEL_NAME` | `gemini-3-pro-image-preview-2k` | 模型名称 |
 | `ADMIN_USERNAME` | `admin` | 管理后台用户名 |
 | `ADMIN_PASSWORD` | `admin123` | 管理后台密码 |
 | `DATABASE_URL` | - | PostgreSQL 连接字符串（Railway 自动提供） |
@@ -288,6 +288,7 @@ git push
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-02-07 | v1.2 | 更新模型为 gemini-3-pro-image-preview-2k，API 地址改为 ismaque.org |
 | 2026-02-07 | v1.1 | 更新模型为 gemini-3-pro-image-preview，添加 2K 分辨率要求 |
 | 2026-02-07 | v1.0 | 初始版本，Railway 部署 |
 
