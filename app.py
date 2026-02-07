@@ -461,6 +461,10 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     from PIL import Image, ImageFilter, ImageEnhance
 
     # ==================== 读取并编码图片 ====================
+    # 检测图片格式
+    img_format = Image.open(image_path).format
+    mime_type = f"image/{img_format.lower()}" if img_format else "image/jpeg"
+
     with open(image_path, 'rb') as f:
         image_data = base64.b64encode(f.read()).decode()
 
@@ -572,14 +576,17 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             "contents": [{
                 "parts": [
                     {"text": prompt_text},
-                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                    {"inline_data": {"mime_type": mime_type, "data": image_data}}
                 ]
             }],
             "generationConfig": {
                 "temperature": 0.9,
                 "topP": 0.95,
                 "responseModalities": ["IMAGE"],
-                "imageFormat": "PNG"
+                "imageFormat": "PNG",
+                # 添加重绘幅度参数（关键修复！）
+                "sampleCount": 1,
+                "aspectRatio": "3:4"
             }
         }
         api_format_name = "Gemini 原生格式"
@@ -593,14 +600,21 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt_text},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_data}"}}
                     ]
                 }
             ],
             "temperature": 0.9,
             "top_p": 0.95,
             "seed": random_seed,
-            "max_tokens": 4096
+            "max_tokens": 4096,
+            # 添加重绘幅度参数（关键修复！）
+            # 注意：不同的API提供商可能使用不同的参数名
+            "extra_body": {
+                "strength": 0.75,  # 重绘幅度：0.0-1.0，越高变化越大
+                "guidance_scale": 7.5,  # 引导强度：控制对prompt的遵循程度
+                "image_guidance_scale": 1.5  # 图像引导强度：控制对原图的保留程度
+            }
         }
         api_format_name = "OpenAI 兼容格式"
         payload_type = "OpenAI chat/completions 格式"
