@@ -608,16 +608,12 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
             "top_p": 0.95,
             "seed": random_seed,
             "max_tokens": 4096,
-            # 添加重绘幅度参数（关键修复！）
-            # 注意：不同的API提供商可能使用不同的参数名
-            "extra_body": {
-                "strength": 0.75,  # 重绘幅度：0.0-1.0，越高变化越大
-                "guidance_scale": 7.5,  # 引导强度：控制对prompt的遵循程度
-                "image_guidance_scale": 1.5  # 图像引导强度：控制对原图的保留程度
-            }
+            # 修复：将参数直接放在payload根级别（不使用extra_body）
+            "strength": 0.75,  # 重绘幅度：0.0-1.0，越高变化越大
+            "guidance_scale": 7.5,  # 引导强度：控制对prompt的遵循程度
         }
         api_format_name = "OpenAI 兼容格式"
-        payload_type = "OpenAI chat/completions 格式"
+        payload_type = "OpenAI chat/completions 格式（strength在根级别）"
 
     # ==================== 打印发送给 API 的数据 ====================
     print("=" * 70)
@@ -628,6 +624,18 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     print(f"  图片数据大小: {len(image_data)} 字符 (base64)")
     print(f"  Payload 结构: {payload_type}")
     print("-" * 70)
+
+    # 验证payload中的关键参数
+    if API_FORMAT != 'gemini':
+        print("[验证] Payload关键参数:")
+        print(f"  - strength: {payload.get('strength', '未设置')} ❗")
+        print(f"  - guidance_scale: {payload.get('guidance_scale', '未设置')}")
+        print(f"  - temperature: {payload.get('temperature')}")
+        print(f"  - seed: {payload.get('seed')}")
+        if 'strength' not in payload:
+            print("  ⚠️ 警告: strength参数未设置，可能导致返回原图！")
+        print("-" * 70)
+
     print("📤 Prompt 内容 (发送给 API):")
     print(prompt_text)
     print("=" * 70)
