@@ -86,57 +86,70 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
-# 支持多个 API 提供商: laozhang.ai, 12ai.org
+# 支持多个 API 提供商: apicore.ai, laozhang.ai, 12ai.org
 # 使用更可靠的端点配置
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 
 # API 提供商选择
-API_PROVIDER = os.getenv('API_PROVIDER', '12ai')  # 'laozhang' 或 '12ai'
+API_PROVIDER = os.getenv('API_PROVIDER', 'apicore')  # 'apicore', 'laozhang' 或 '12ai'
 
 # API 基础 URL 配置
-# laozhang.ai 使用 OpenAI 兼容格式
+# apicore.ai 和 laozhang.ai 使用 OpenAI 兼容格式
 API_BASE_URLS = {
+    'apicore': 'https://api.apicore.ai/v1',  # 推荐：图像生成 API
     'laozhang': 'https://api.laozhang.ai/v1',
     '12ai': 'https://ismaque.org/v1'
 }
 
-# 支持多个模型选项 (12ai.org 支持的图像生成模型)
+# 支持多个模型选项 (图像生成模型)
 MODEL_CONFIGS = {
+    'gemini-3-pro-image-preview': {
+        'name': 'Gemini 3 Pro Image Preview (推荐)',
+        'model_id': 'gemini-3-pro-image-preview',
+        'provider': 'apicore'
+    },
     'gemini-3-pro-image-preview-2k': {
-        'name': 'Gemini 3 Pro Image Preview 2K (推荐)',
-        'model_id': 'gemini-3-pro-image-preview-2k'
+        'name': 'Gemini 3 Pro Image Preview 2K',
+        'model_id': 'gemini-3-pro-image-preview-2k',
+        'provider': '12ai'
     },
     'gemini-2.0-flash-exp': {
         'name': 'Gemini 2.0 Flash Exp (图像生成)',
-        'model_id': 'gemini-2.0-flash-exp'
+        'model_id': 'gemini-2.0-flash-exp',
+        'provider': '12ai'
     },
     'gemini-1.5-pro-latest': {
         'name': 'Gemini 1.5 Pro (旗舰)',
-        'model_id': 'gemini-1.5-pro-latest'
+        'model_id': 'gemini-1.5-pro-latest',
+        'provider': '12ai'
     },
     'gpt-4o': {
         'name': 'GPT-4o (OpenAI)',
-        'model_id': 'gpt-4o'
+        'model_id': 'gpt-4o',
+        'provider': 'openai'
     }
 }
 
 # 从环境变量或默认值获取模型
-# 默认使用 gemini-3-pro-image-preview-2k (图像生成模型)
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
-model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview-2k'])
+# 默认使用 gemini-3-pro-image-preview (图像生成模型)
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview')
+model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview'])
 
 # 构建完整的 API URL
-base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
+base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['apicore'])
 
 # 检测是否是 Gemini 模型（用于图像生成）
 is_gemini_model = MODEL_NAME.startswith('gemini-')
 
-if is_gemini_model and API_PROVIDER == '12ai':
-    # Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
+# API 格式和 URL 构建逻辑
+# apicore 和 laozhang 使用 OpenAI 兼容格式
+# 12ai 的 Gemini 模型使用 Gemini 原生格式
+if API_PROVIDER == '12ai' and is_gemini_model:
+    # 12ai 的 Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
     NANOBANANA_API_URL = f"{base_url}/models/{MODEL_NAME}:generateContent"
     API_FORMAT = 'gemini'
 else:
-    # 其他模型使用 OpenAI 兼容格式: /v1/chat/completions
+    # apicore、laozhang 或其他使用 OpenAI 兼容格式: /v1/chat/completions
     NANOBANANA_API_URL = f"{base_url}/chat/completions"
     API_FORMAT = 'openai'
 
