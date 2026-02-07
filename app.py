@@ -522,8 +522,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 【风格要求】
 - 美式专业职场风格，{'微微倾斜角度拍摄' if angle == 'slight_tilt' else '正面角度拍摄'}
 - 如军人般挺拔{'，身体微微侧转，面部正对镜头' if angle == 'slight_tilt' else '，完全正对镜头'}
-- 超高清，4K分辨率，清晰对焦
-- 3:4比例，分辨率不低于2048x2730像素
+- 超高清，2K分辨率，清晰对焦
+- 3:4比例，确保输出分辨率为2048x2730像素
 - 影棚级布光，构图优雅
 
 【禁止事项】
