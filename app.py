@@ -685,6 +685,8 @@ TECHNICAL SPECIFICATIONS:
         payload_type = "Gemini contents/parts 格式"
     else:
         # OpenAI 兼容格式
+        # 注意：某些 API 可能不支持 strength/guidance_scale 参数
+        # 如果生成效果不好，可以尝试移除这些参数
         payload = {
             "model": MODEL_NAME,
             "messages": [
@@ -699,13 +701,12 @@ TECHNICAL SPECIFICATIONS:
             "temperature": 0.9,
             "top_p": 0.95,
             "seed": random_seed,
-            "max_tokens": 4096,
-            # 修复：将参数直接放在payload根级别（不使用extra_body）
-            "strength": 0.75,  # 重绘幅度：0.0-1.0，越高变化越大
-            "guidance_scale": 7.5,  # 引导强度：控制对prompt的遵循程度
+            "max_tokens": 4096
+            # 注意：strength/guidance_scale 参数在 OpenAI 格式下可能无效
+            # 如需使用，请确认你的 API 提供商支持这些参数
         }
         api_format_name = "OpenAI 兼容格式"
-        payload_type = "OpenAI chat/completions 格式（strength在根级别）"
+        payload_type = "OpenAI chat/completions 格式"
 
     # ==================== 打印发送给 API 的数据 ====================
     print("=" * 70)
@@ -720,12 +721,10 @@ TECHNICAL SPECIFICATIONS:
     # 验证payload中的关键参数
     if API_FORMAT != 'gemini':
         print("[验证] Payload关键参数:")
-        print(f"  - strength: {payload.get('strength', '未设置')} ❗")
-        print(f"  - guidance_scale: {payload.get('guidance_scale', '未设置')}")
+        print(f"  - model: {payload.get('model')}")
         print(f"  - temperature: {payload.get('temperature')}")
         print(f"  - seed: {payload.get('seed')}")
-        if 'strength' not in payload:
-            print("  ⚠️ 警告: strength参数未设置，可能导致返回原图！")
+        print(f"  - max_tokens: {payload.get('max_tokens')}")
         print("-" * 70)
 
     print("📤 Prompt 内容 (发送给 API):")
@@ -842,9 +841,16 @@ TECHNICAL SPECIFICATIONS:
                             if isinstance(content, str):
                                 print(f"[API] Content 长度: {len(content)}")
                                 print(f"[API] Content 预览: {content[:200]}...")
-
+                                
+                                # 检查是否是纯文本响应（不是图片）
+                                if content.strip().startswith(('你好', '您好', 'Hello', '你好！', 'This', 'The', '我', '你')) or len(content) > 1000 and 'base64' not in content:
+                                    print(f"[API] ⚠️ API 返回了文本而不是图片！")
+                                    print(f"[API] 文本内容: {content[:500]}...")
+                                    last_api_call['error'] = f'API返回文本而非图片: {content[:200]}'
+                                    # 不抛出异常，让代码进入模拟模式
+                                    
                                 # 检查是否是 base64 编码的图片 (data:image/...;base64,...)
-                                if content.startswith('data:image') and 'base64' in content:
+                                elif content.startswith('data:image') and 'base64' in content:
                                     import base64
                                     # 提取 base64 数据
                                     base64_data = content.split('base64,')[-1]
