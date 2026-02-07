@@ -135,6 +135,9 @@ MODEL_CONFIGS = {
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview'])
 
+# Prompt语言设置：'zh' 中文, 'en' 英文（Instructional Prompting）
+PROMPT_LANGUAGE = os.getenv('PROMPT_LANGUAGE', 'zh')  # 默认中文
+
 # 构建完整的 API URL
 base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['apicore'])
 
@@ -169,6 +172,7 @@ print(f"🔗 API URL: {NANOBANANA_API_URL}")
 print(f"🔑 API Key: {'已配置 (' + str(len(NANOBANANA_API_KEY)) + ' 字符)' if NANOBANANA_API_KEY else '❌ 未配置'}")
 print(f"💾 数据库类型: {'PostgreSQL' if POSTGRES_AVAILABLE else 'SQLite'}")
 print(f"📁 上传目录: {upload_folder}")
+print(f"🌐 Prompt语言: {'英文 (Instructional Prompting)' if PROMPT_LANGUAGE == 'en' else '中文'} (环境变量: PROMPT_LANGUAGE)")
 print("=" * 70)
 
 from functools import wraps
@@ -562,6 +566,94 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     print("📝 完整 Prompt:")
     print(prompt_text)
     print("=" * 70)
+
+    # ==================== 生成英文Instructional Prompting（可选） ====================
+    if PROMPT_LANGUAGE == 'en':
+        # 服装映射（英文）
+        clothing_en = {
+            'business_suit': 'professional business suit',
+            'formal_dress': 'formal dress attire',
+            'casual_shirt': 'casual button-down shirt',
+            'turtleneck': 'elegant turtleneck sweater',
+            'tshirt': 'simple minimalist t-shirt',
+        }
+
+        # 背景映射（英文）
+        background_en_map = {
+            'textured': f'textured studio background in {color_desc} tones, soft professional lighting, subtle bokeh',
+            'solid': f'clean solid {color_desc} background, uniform and minimal'
+        }
+
+        # 美颜映射（英文）
+        beautify_en = {
+            'yes': 'SUBTLE BEAUTIFICATION: natural skin brightening, refined texture, maintain realistic proportions',
+            'no': 'NO RETOUCHING: preserve authentic appearance without enhancements'
+        }
+
+        # 角度映射（英文）
+        angle_en = {
+            'front': 'front-facing, looking directly at camera',
+            'slight_tilt': 'slight tilt angle, body slightly turned, face forward'
+        }
+
+        bg_desc_en = background_en_map.get(background, background_en_map['textured'])
+        angle_desc_en = angle_en.get(angle, angle_en['front'])
+        beautify_desc_en = beautify_en.get(beautify, beautify_en['no'])
+        clothing_desc_en = clothing_en.get(clothing, clothing_en['business_suit'])
+
+        # 生成英文Instructional Prompt
+        prompt_text = f"""GENERATE A PROFESSIONAL PORTRAIT PHOTO USING THE FOLLOWING INSTRUCTIONS:
+
+TASK: Image-to-Image Transformation
+Create a new professional portrait by changing clothing and background while preserving facial identity.
+
+SUBJECT REQUIREMENTS:
+- MAINTAIN exact facial features and hairstyle from reference
+- PRESERVE gender and age characteristics
+- OPTIMIZE skin tone lighting for professional look
+- {beautify_desc_en}
+
+CLOTHING INSTRUCTIONS:
+- DRESS subject in {clothing_desc_en}
+- ENSURE proper fit with natural draping
+- CREATE realistic appearance with appropriate textures
+
+BACKGROUND INSTRUCTIONS:
+- REPLACE original background completely
+- USE {bg_desc_en}
+- MAINTAIN clean and professional aesthetic
+
+COMPOSITION AND STYLE:
+- COMPOSE professional American-style portrait
+- POSITION subject in {angle_desc_en}
+- DIRECT subject to stand tall with military-grade posture
+- SET ultra-high 2K resolution with sharp focus
+- FRAME at 3:4 aspect ratio (2048x2730 pixels)
+- LIGHT with studio-grade lighting setup
+- CREATE elegant and balanced composition
+
+CRITICAL CONSTRAINTS:
+- DO NOT return the original image
+- DO NOT apply simple filters or color adjustments
+- MUST generate a completely new image
+- MUST visibly differ from original: different clothing, background, lighting
+
+QUALITY VERIFICATION:
+Generated image MUST show clear differences:
+1. Different clothing ({clothing_desc_en})
+2. Different background ({bg_desc_en})
+3. Professional studio-quality lighting
+
+TECHNICAL SPECIFICATIONS:
+- Resolution: 2048x2730 pixels (2K)
+- Aspect Ratio: 3:4
+- Format: Portrait photography
+- Style: Professional corporate headshot
+- Strength: 0.75 (high transformation)"""
+
+        print("=" * 70)
+        print("🌍 Using English Instructional Prompting")
+        print("=" * 70)
 
     # ==================== 构建请求 payload ====================
     # 添加随机种子以确保每次生成不同的图片
