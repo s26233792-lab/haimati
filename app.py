@@ -1160,8 +1160,11 @@ def debug_health():
     try:
         conn = get_db_connection()
         c = get_db_cursor(conn)
-        c.execute('SELECT name FROM sqlite_master WHERE type="table"') if db_type == 'sqlite' else \
-                c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+
+        if db_type == 'sqlite':
+            c.execute('SELECT name FROM sqlite_master WHERE type="table"')
+        else:
+            c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
 
         tables = [row[0] for row in c.fetchall()]
         health_status['checks']['tables'] = {
@@ -1203,11 +1206,27 @@ def status(code):
     logs = c.fetchall()
     conn.close()
 
+    # 兼容多种数据库返回格式（字典或元组）
+    history = []
+    for row in logs:
+        if isinstance(row, dict):
+            history.append({
+                'style': row['style'],
+                'time': row['created_at'],
+                'result': row['result_image']
+            })
+        else:
+            history.append({
+                'style': row[0],
+                'time': row[1],
+                'result': row[2]
+            })
+
     return jsonify({
         'success': True,
         'remaining': result['remaining'],
         'max_uses': result['max_uses'],
-        'history': [{'style': row[0], 'time': row[1], 'result': row[2]} for row in logs]
+        'history': history
     })
 
 
@@ -1349,7 +1368,11 @@ def export_security_logs():
     output = io.StringIO()
     output.write("验证码,IP地址,是否成功,失败原因,时间\n")
     for log in logs:
-        output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
+        # 兼容字典和元组格式
+        if isinstance(log, dict):
+            output.write(f"{log.get('code', '') or ''},{log.get('ip_address', '') or ''},{log.get('success', False)},{log.get('failure_reason', '') or ''},{log.get('created_at', '')}\n")
+        else:
+            output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
 
     from flask import Response
     return Response(
