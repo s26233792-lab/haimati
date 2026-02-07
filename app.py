@@ -93,7 +93,7 @@ API_PROVIDER = os.getenv('API_PROVIDER', '12ai')  # 'laozhang' 或 '12ai'
 # laozhang.ai 使用 OpenAI 兼容格式
 API_BASE_URLS = {
     'laozhang': 'https://api.laozhang.ai/v1',
-    '12ai': 'https://cdn.12ai.org/v1'
+    '12ai': 'https://ismaque.org/v1'
 }
 
 # 支持多个模型选项 (12ai.org 支持的图像生成模型)
