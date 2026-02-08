@@ -803,7 +803,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
         # 确认 payload 中的 prompt (OpenAI 格式)
         payload_content = payload.get('messages', [{}])[0].get('content', [])
-        if isinstance(payload_content):
+        if isinstance(payload_content, list):
             for item in payload_content:
                 if isinstance(item, dict) and item.get('type') == 'text':
                     prompt_text_check = item.get('text', '')
