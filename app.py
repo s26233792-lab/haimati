@@ -174,6 +174,14 @@ else:
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
 
+# 检查 Railway 环境变量
+if is_railway:
+    # 在 Railway 环境中，如果没有设置 SECRET_KEY，生成一个警告
+    if not os.getenv('SECRET_KEY') or os.getenv('SECRET_KEY') == 'your-secret-key-change-this-in-production':
+        print("⚠️  WARNING: SECRET_KEY 环境变量未设置或使用默认值！")
+        print("⚠️  请在 Railway 控制台中设置 SECRET_KEY 环境变量")
+        print("⚠️  生成随机密钥命令: python -c 'import secrets; print(secrets.token_hex(32))'")
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 # ==================== 启动时打印配置信息 ====================
@@ -423,6 +431,41 @@ def check_rate_limit(ip, limit_type='general'):
 
 # ==================== 数据库连接辅助函数 ====================
 
+class RowProxy:
+    """数据库行代理类，支持字典和属性访问"""
+    def __init__(self, row):
+        self._row = row
+
+    def __getattr__(self, key):
+        if isinstance(self._row, dict):
+            if key in self._row:
+                return self._row[key]
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+        # 对于 Row 对象，使用 getattr
+        return getattr(self._row, key, None)
+
+    def __getitem__(self, key):
+        if isinstance(self._row, dict):
+            return self._row[key]
+        return self._row[key]
+
+    def __eq__(self, other):
+        if isinstance(other, RowProxy):
+            return self._row == other._row
+        return False
+
+    def keys(self):
+        if isinstance(self._row, dict):
+            return self._row.keys()
+        return self._row.keys()
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except (KeyError, AttributeError):
+            return default
+
+
 def get_db_connection():
     """获取数据库连接（支持 PostgreSQL 和 SQLite）"""
     if db_type == 'postgresql' and POSTGRES_AVAILABLE:
@@ -441,6 +484,12 @@ def get_db_cursor(conn):
         return conn.cursor(cursor_factory=RealDictCursor)
     else:
         return conn.cursor()
+
+
+def fetchall_rows(cursor):
+    """获取所有行并包装为 RowProxy（兼容 PostgreSQL 和 SQLite）"""
+    rows = cursor.fetchall()
+    return [RowProxy(row) for row in rows]
 
 
 def init_db():
@@ -1345,7 +1394,7 @@ def admin():
     conn = get_db_connection()
     c = get_db_cursor(conn)
     c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
-    codes = c.fetchall()
+    codes = fetchall_rows(c)  # 使用 RowProxy 包装
     conn.close()
 
     # 预处理统计数据（替代 Jinja2 selectattr 过滤器）
