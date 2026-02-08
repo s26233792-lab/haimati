@@ -1347,7 +1347,16 @@ def admin():
     c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
     codes = c.fetchall()
     conn.close()
-    return render_template('admin.html', codes=codes)
+
+    # 预处理统计数据（替代 Jinja2 selectattr 过滤器）
+    stats = {
+        'total': len(codes),
+        'new': sum(1 for code in codes if code.used_count == 0),
+        'used': sum(1 for code in codes if code.used_count > 0),
+        'total_uses': sum(code.used_count for code in codes)
+    }
+
+    return render_template('admin.html', codes=codes, stats=stats)
 
 
 @app.route('/admin/generate_codes', methods=['POST'])
@@ -1516,4 +1525,4 @@ if __name__ == '__main__':
     print("📍 访问地址: http://localhost:5000")
     print("🔧 管理后台: http://localhost:5000/admin")
     print("💡 提示: 先运行 generate_codes.py 生成验证码")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
