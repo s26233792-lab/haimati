@@ -2,19 +2,12 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#6366f1">
-    <meta name="description" content="AI肖像馆 - 30秒打造专业职场形象，美式肖像生成器">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI肖像馆 - 美式肖像生成器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
-    <!-- Toast 通知容器 -->
-    <div class="toast-container" id="toastContainer"></div>
-
     <div class="container">
         <!-- 示例展示区域 -->
         <div class="showcase-section">
@@ -24,7 +17,7 @@
             </div>
             <!-- 效果对比展示 -->
             <div class="showcase-comparison-wrapper">
-                <img src="/static/images/showcase_comparison.png" alt="效果对比" class="comparison-image" loading="lazy">
+                <img src="/static/images/showcase_comparison.png" alt="效果对比" class="comparison-image">
             </div>
             <div class="showcase-features">
                 <div class="feature-item">
@@ -53,13 +46,6 @@
                 <p class="subtitle">美式肖像生成器 | 30秒打造专业职场形象</p>
             </div>
 
-            <!-- 步骤指示器 -->
-            <div class="step-indicator" id="stepIndicator">
-                <div class="step-dot active" data-step="1">1</div>
-                <div class="step-dot" data-step="2">2</div>
-                <div class="step-dot" data-step="3">3</div>
-            </div>
-
             <!-- 步骤1: 输入验证码 -->
             <div id="step1" class="step">
                 <div class="step-header">
@@ -68,17 +54,14 @@
                 </div>
                 <div class="step-body">
                     <div class="mb-3">
-                        <label class="form-label">
-                            <span>🔐</span> 请输入验证码
-                        </label>
+                        <label class="form-label">请输入验证码</label>
                         <input type="text" id="codeInput" class="form-control form-control-lg"
-                               placeholder="输入8位验证码" maxlength="8" autocomplete="off" inputmode="verbatim">
+                               placeholder="输入8位验证码" maxlength="8" style="text-transform: uppercase;">
                         <div id="codeError" class="error-msg"></div>
                     </div>
                     <div id="verifyError" class="alert alert-danger" style="display: none;"></div>
                     <button onclick="verifyCode()" class="btn btn-primary btn-lg w-100" id="verifyBtn">
-                        <span>验证并开始</span>
-                        <span id="verifyBtnIcon">→</span>
+                        验证并开始
                     </button>
                 </div>
             </div>
@@ -101,24 +84,24 @@
                 <div class="step-body">
                     <!-- 服装选择 -->
                     <div class="mb-4">
-                        <label class="form-label">👔 选择服装</label>
+                        <label class="form-label">① 选择服装</label>
                         <select id="clothingSelect" class="form-select form-select-lg">
-                            <option value="business_suit">商务西装 - 经典职场风格</option>
-                            <option value="keep_original">和原图保持一致 - 保留原始服装</option>
-                            <option value="formal_dress">正装礼服 - 正式场合风格</option>
+                            <option value="business_suit">商务西装</option>
+                            <option value="keep_original">和原图保持一致</option>
+                            <option value="formal_dress">正装礼服</option>
                         </select>
                     </div>
 
                     <!-- 拍摄角度选择 -->
                     <div class="mb-4">
-                        <label class="form-label">📷 选择拍摄角度</label>
+                        <label class="form-label">② 选择拍摄角度</label>
                         <div class="angle-selector">
                             <label class="angle-option">
                                 <input type="radio" name="angle" value="front" checked>
                                 <div class="angle-card">
-                                    <div class="angle-icon">🎯</div>
+                                    <div class="angle-icon">📷</div>
                                     <div class="angle-name">正面照</div>
-                                    <div class="angle-desc">标准正面肖像，适合证件照</div>
+                                    <div class="angle-desc">标准正面肖像</div>
                                 </div>
                             </label>
                             <label class="angle-option">
@@ -126,7 +109,7 @@
                                 <div class="angle-card">
                                     <div class="angle-icon">📸</div>
                                     <div class="angle-name">微微倾斜</div>
-                                    <div class="angle-desc">身体微侧，面部朝前，更有立体感</div>
+                                    <div class="angle-desc">身体微侧，面部朝前</div>
                                 </div>
                             </label>
                         </div>
@@ -134,7 +117,7 @@
 
                     <!-- 背景选择 -->
                     <div class="mb-4">
-                        <label class="form-label">🎨 选择背景</label>
+                        <label class="form-label">③ 选择背景</label>
                         <div class="background-selector">
                             <label class="background-option" data-bg="textured">
                                 <input type="radio" name="background" value="textured" checked onchange="updateColorLabel()">
@@ -179,7 +162,7 @@
                                 <label class="color-option">
                                     <input type="radio" name="bgColor" value="black">
                                     <div class="color-card" style="background: #343a40;">
-                                        <div class="color-name" style="color: white;">黑色</div>
+                                        <div class="color-name">黑色</div>
                                     </div>
                                 </label>
                                 <label class="color-option">
@@ -194,11 +177,11 @@
 
                     <!-- 图片上传 -->
                     <div class="mb-4">
-                        <label class="form-label">📤 上传照片</label>
+                        <label class="form-label">④ 上传照片</label>
                         <div class="upload-area" id="uploadArea">
                             <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" hidden>
                             <div class="upload-placeholder" id="uploadPlaceholder">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                     <polyline points="17 8 12 3 7 8"/>
                                     <line x1="12" y1="3" x2="12" y2="15"/>
@@ -206,31 +189,14 @@
                                 <p>点击或拖拽上传图片</p>
                                 <small>支持 PNG、JPG、WEBP 格式，最大16MB</small>
                             </div>
-                            <img id="previewImage" class="preview-image" style="display: none;" alt="预览">
+                            <img id="previewImage" class="preview-image" style="display: none;">
                         </div>
-                    </div>
-
-                    <!-- 美颜开关 -->
-                    <div class="mb-4">
-                        <label class="form-label">✨ 美颜选项</label>
-                        <div class="beautify-option">
-                            <label class="beautify-toggle">
-                                <input type="checkbox" id="beautifyCheckbox">
-                                <span class="beautify-slider"></span>
-                                <span class="beautify-label">
-                                    <span class="beautify-title">轻微美颜</span>
-                                    <span class="beautify-desc">自然提亮肤色，优化肤质，保持真实感</span>
-                                </span>
-                            </label>
-                        </div>
-                        <small class="text-muted">💡 提示：轻微美颜可以让照片看起来更精神，但会保持您的真实面容特征</small>
                     </div>
 
                     <!-- 生成按钮 -->
                     <button onclick="generatePortrait()" id="generateBtn"
                             class="btn btn-primary btn-lg w-100" disabled>
-                        <span id="generateBtnText">生成肖像照</span>
-                        <span id="generateBtnIcon">✨</span>
+                        生成肖像照
                     </button>
 
                     <!-- 进度 -->
@@ -239,10 +205,7 @@
                             <div class="progress-bar progress-bar-striped progress-bar-animated"
                                  role="progressbar" style="width: 100%"></div>
                         </div>
-                        <p class="progress-text">
-                            <span id="progressText">正在生成中，请稍候...</span>
-                            <span id="progressDots">...</span>
-                        </p>
+                        <p class="text-center mt-2">正在生成中，请稍候...</p>
                     </div>
                 </div>
             </div>
@@ -262,7 +225,7 @@
                         <div class="reminder-icon">💾</div>
                         <div class="reminder-text">
                             <strong>请务必保存图片！</strong>
-                            <small>刷新页面后将无法找回，建议立即下载到本地</small>
+                            <br><small>刷新页面后将无法找回，建议立即下载到本地</small>
                         </div>
                     </div>
                     <div class="result-area">
@@ -282,9 +245,8 @@
         </div>
 
         <!-- 页脚 -->
-        <div class="footer">
-            <p>AI肖像馆 - 美式肖像生成器</p>
-            <small>有问题请联系客服</small>
+        <div class="text-center mt-4 text-muted">
+            <small>AI肖像馆 - 美式肖像生成器 | 有问题请联系客服</small>
         </div>
     </div>
 

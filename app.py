@@ -74,10 +74,6 @@ if db_type == 'postgresql':
         else:
             db_config = 'codes.db'
 
-# SQL 占位符配置（兼容 PostgreSQL 和 SQLite）
-# PostgreSQL 使用 %s，SQLite 使用 ?
-PLACEHOLDER = '%s' if db_type == 'postgresql' else '?'
-
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = upload_folder
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB max file size
@@ -86,73 +82,91 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # NanoBanana API 配置
-# 支持多个 API 提供商: apicore.ai, laozhang.ai, 12ai.org
+# 支持多个 API 提供商: laozhang.ai, 12ai.org
 # 使用更可靠的端点配置
 NANOBANANA_API_KEY = os.getenv('NANOBANANA_API_KEY', '')
 
 # API 提供商选择
-API_PROVIDER = os.getenv('API_PROVIDER', 'apicore')  # 'apicore', 'laozhang' 或 '12ai'
+API_PROVIDER = os.getenv('API_PROVIDER', '12ai')  # 'laozhang' 或 '12ai'
 
-# API 基础 URL 配置
-# apicore.ai 和 laozhang.ai 使用 OpenAI 兼容格式
-API_BASE_URLS = {
-    'apicore': 'https://api.apicore.ai/v1',  # 推荐：图像生成 API
-    'laozhang': 'https://api.laozhang.ai/v1',
-    '12ai': 'https://ismaque.org/v1'
+# 代理配置（支持国内网络环境）
+HTTP_PROXY = os.getenv('HTTP_PROXY', '')
+HTTPS_PROXY = os.getenv('HTTPS_PROXY', '')
+PROXIES = {}
+if HTTP_PROXY:
+    PROXIES['http'] = HTTP_PROXY
+if HTTPS_PROXY:
+    PROXIES['https'] = HTTPS_PROXY
+
+# 网络超时配置（秒）
+CONNECT_TIMEOUT = int(os.getenv('CONNECT_TIMEOUT', '10'))  # 连接超时
+READ_TIMEOUT = int(os.getenv('READ_TIMEOUT', '120'))       # 读取超时
+
+# 断路器配置
+CIRCUIT_BREAKER_THRESHOLD = int(os.getenv('CIRCUIT_BREAKER_THRESHOLD', '5'))  # 失败次数阈值
+CIRCUIT_BREAKER_TIMEOUT = int(os.getenv('CIRCUIT_BREAKER_TIMEOUT', '60'))     # 断路器恢复时间（秒）
+
+# 断路器状态
+circuit_breaker = {
+    'failures': 0,
+    'last_failure_time': None,
+    'open': False
 }
 
-# 支持多个模型选项 (图像生成模型)
+# API 基础 URL 配置（支持环境变量覆盖）
+API_BASE_URLS = {
+    'laozhang': os.getenv('LAOZHANG_API_URL', 'https://api.laozhang.ai/v1'),
+    # 12ai.org 多线路配置
+    '12ai': os.getenv('AI12ORG_API_URL', 'https://new.12ai.org/v1'),      # 软银线路（默认）
+    '12ai-hk': os.getenv('AI12ORG_HK_URL', 'https://hk.12ai.org/v1'),    # 香港线路
+    '12ai-cdn': os.getenv('AI12ORG_CDN_URL', 'https://cdn.12ai.org/v1'), # CDN线路
+    'custom': os.getenv('CUSTOM_API_URL', '')  # 支持自定义 API 端点
+}
+
+# 如果设置了自定义 API 提供商，使用自定义 URL
+if API_PROVIDER == 'custom' and API_BASE_URLS['custom']:
+    base_url = API_BASE_URLS['custom']
+elif API_PROVIDER not in API_BASE_URLS or not API_BASE_URLS.get(API_PROVIDER):
+    print(f"警告: 未知的 API 提供商 '{API_PROVIDER}'，使用默认的 12ai")
+    API_PROVIDER = '12ai'
+
+# 支持多个模型选项 (12ai.org 支持的图像生成模型)
 MODEL_CONFIGS = {
-    'gemini-3-pro-image-preview': {
-        'name': 'Gemini 3 Pro Image Preview (推荐)',
-        'model_id': 'gemini-3-pro-image-preview',
-        'provider': 'apicore'
-    },
     'gemini-3-pro-image-preview-2k': {
-        'name': 'Gemini 3 Pro Image Preview 2K',
-        'model_id': 'gemini-3-pro-image-preview-2k',
-        'provider': '12ai'
+        'name': 'Gemini 3 Pro Image Preview 2K (推荐)',
+        'model_id': 'gemini-3-pro-image-preview-2k'
     },
     'gemini-2.0-flash-exp': {
         'name': 'Gemini 2.0 Flash Exp (图像生成)',
-        'model_id': 'gemini-2.0-flash-exp',
-        'provider': '12ai'
+        'model_id': 'gemini-2.0-flash-exp'
     },
     'gemini-1.5-pro-latest': {
         'name': 'Gemini 1.5 Pro (旗舰)',
-        'model_id': 'gemini-1.5-pro-latest',
-        'provider': '12ai'
+        'model_id': 'gemini-1.5-pro-latest'
     },
     'gpt-4o': {
         'name': 'GPT-4o (OpenAI)',
-        'model_id': 'gpt-4o',
-        'provider': 'openai'
+        'model_id': 'gpt-4o'
     }
 }
 
 # 从环境变量或默认值获取模型
-# 默认使用 gemini-3-pro-image-preview (图像生成模型)
-MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview')
-model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview'])
-
-# Prompt语言设置：'zh' 中文, 'en' 英文（Instructional Prompting）
-PROMPT_LANGUAGE = os.getenv('PROMPT_LANGUAGE', 'zh')  # 默认中文
+# 默认使用 gemini-3-pro-image-preview-2k (图像生成模型)
+MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
+model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview-2k'])
 
 # 构建完整的 API URL
-base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['apicore'])
+base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
 
 # 检测是否是 Gemini 模型（用于图像生成）
 is_gemini_model = MODEL_NAME.startswith('gemini-')
 
-# API 格式和 URL 构建逻辑
-# apicore 和 laozhang 使用 OpenAI 兼容格式
-# 12ai 的 Gemini 模型使用 Gemini 原生格式
-if API_PROVIDER == '12ai' and is_gemini_model:
-    # 12ai 的 Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
+if is_gemini_model and API_PROVIDER == '12ai':
+    # Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
     NANOBANANA_API_URL = f"{base_url}/models/{MODEL_NAME}:generateContent"
     API_FORMAT = 'gemini'
 else:
-    # apicore、laozhang 或其他使用 OpenAI 兼容格式: /v1/chat/completions
+    # 其他模型使用 OpenAI 兼容格式: /v1/chat/completions
     NANOBANANA_API_URL = f"{base_url}/chat/completions"
     API_FORMAT = 'openai'
 
@@ -172,10 +186,152 @@ print(f"🔗 API URL: {NANOBANANA_API_URL}")
 print(f"🔑 API Key: {'已配置 (' + str(len(NANOBANANA_API_KEY)) + ' 字符)' if NANOBANANA_API_KEY else '❌ 未配置'}")
 print(f"💾 数据库类型: {'PostgreSQL' if POSTGRES_AVAILABLE else 'SQLite'}")
 print(f"📁 上传目录: {upload_folder}")
-print(f"🌐 Prompt语言: {'英文 (Instructional Prompting)' if PROMPT_LANGUAGE == 'en' else '中文'} (环境变量: PROMPT_LANGUAGE)")
+print(f"⏱️  连接超时: {CONNECT_TIMEOUT}秒, 读取超时: {READ_TIMEOUT}秒")
+if PROXIES:
+    print(f"🔀 代理配置: {PROXIES}")
+else:
+    print(f"🔀 代理配置: 未配置（直连）")
+print(f"🔌 断路器阈值: {CIRCUIT_BREAKER_THRESHOLD}次, 恢复时间: {CIRCUIT_BREAKER_TIMEOUT}秒")
 print("=" * 70)
 
 from functools import wraps
+
+# ==================== 断路器机制 ====================
+
+def check_circuit_breaker():
+    """检查断路器状态，如果断路器打开则返回 False"""
+    now = time.time()
+
+    if circuit_breaker['open']:
+        # 检查是否可以尝试恢复
+        if now - circuit_breaker['last_failure_time'] > CIRCUIT_BREAKER_TIMEOUT:
+            print("[断路器] 尝试恢复服务...")
+            circuit_breaker['open'] = False
+            circuit_breaker['failures'] = 0
+            return True
+        else:
+            remaining_time = int(CIRCUIT_BREAKER_TIMEOUT - (now - circuit_breaker['last_failure_time']))
+            print(f"[断路器] 服务暂时不可用，请 {remaining_time} 秒后重试")
+            return False
+
+    return True
+
+
+def record_api_failure():
+    """记录 API 失败，可能触发断路器"""
+    circuit_breaker['failures'] += 1
+    circuit_breaker['last_failure_time'] = time.time()
+
+    if circuit_breaker['failures'] >= CIRCUIT_BREAKER_THRESHOLD:
+        circuit_breaker['open'] = True
+        print(f"[断路器] API 连续失败 {circuit_breaker['failures']} 次，断路器已打开")
+
+
+def record_api_success():
+    """记录 API 成功，重置断路器"""
+    circuit_breaker['failures'] = 0
+    circuit_breaker['last_failure_time'] = None
+    if circuit_breaker['open']:
+        print("[断路器] 服务已恢复，断路器已关闭")
+        circuit_breaker['open'] = False
+
+
+# ==================== 网络请求辅助函数 ====================
+
+def make_api_request(url, payload, headers):
+    """
+    发送 API 请求，包含完整的错误处理和重试逻辑
+
+    返回: (response, error)
+    """
+    # 检查断路器
+    if not check_circuit_breaker():
+        return None, f"服务暂时不可用，请稍后重试（断路器保护）"
+
+    print(f"[网络] 准备发送请求到: {url}")
+    print(f"[网络] 使用代理: {'是' if PROXIES else '否'}")
+    if PROXIES:
+        print(f"[网络] 代理配置: {PROXIES}")
+    print(f"[网络] 超时设置: 连接={CONNECT_TIMEOUT}秒, 读取={READ_TIMEOUT}秒")
+
+    try:
+        # 创建 Session
+        session = requests.Session()
+
+        # 设置重试策略
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        retry_strategy = Retry(
+            total=3,  # 总共重试3次
+            backoff_factor=1,  # 重试间隔递增因子
+            status_forcelist=[429, 500, 502, 503, 504],  # 需要重试的HTTP状态码
+            allowed_methods=["POST"]  # 允许重试的HTTP方法
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
+        # 发送请求（分别设置连接超时和读取超时）
+        response = session.post(
+            url,
+            json=payload,
+            headers=headers,
+            proxies=PROXIES if PROXIES else None,
+            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),  # (连接超时, 读取超时)
+            verify=True  # 验证SSL证书
+        )
+
+        print(f"[网络] 响应状态码: {response.status_code}")
+        print(f"[网络] 响应时间: {response.elapsed.total_seconds():.2f}秒")
+
+        # 记录成功
+        record_api_success()
+
+        return response, None
+
+    except requests.exceptions.ConnectTimeout as e:
+        error_msg = f"连接超时（{CONNECT_TIMEOUT}秒），请检查网络或代理设置"
+        print(f"[网络] ❌ 连接超时: {e}")
+        record_api_failure()
+        return None, error_msg
+
+    except requests.exceptions.ReadTimeout as e:
+        error_msg = f"读取超时（{READ_TIMEOUT}秒），服务器响应时间过长"
+        print(f"[网络] ❌ 读取超时: {e}")
+        record_api_failure()
+        return None, error_msg
+
+    except requests.exceptions.ConnectionError as e:
+        error_msg = "连接失败，请检查网络连接或API地址是否正确"
+        print(f"[网络] ❌ 连接错误: {e}")
+        record_api_failure()
+        return None, error_msg
+
+    except requests.exceptions.SSLError as e:
+        error_msg = "SSL证书验证失败，请检查网络安全设置"
+        print(f"[网络] ❌ SSL错误: {e}")
+        record_api_failure()
+        return None, error_msg
+
+    except requests.exceptions.ProxyError as e:
+        error_msg = "代理连接失败，请检查代理配置"
+        print(f"[网络] ❌ 代理错误: {e}")
+        return None, error_msg
+
+    except requests.exceptions.RequestException as e:
+        error_msg = f"请求失败: {type(e).__name__} - {str(e)}"
+        print(f"[网络] ❌ 请求异常: {e}")
+        record_api_failure()
+        return None, error_msg
+
+    except Exception as e:
+        error_msg = f"未知错误: {type(e).__name__} - {str(e)}"
+        print(f"[网络] ❌ 未知异常: {e}")
+        import traceback
+        print(f"[网络] 堆栈跟踪:\n{traceback.format_exc()}")
+        record_api_failure()
+        return None, error_msg
 
 
 def admin_required(f):
@@ -388,7 +544,7 @@ def verify_code(code):
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    c.execute(f'SELECT max_uses, used_count, status FROM verification_codes WHERE code = {PLACEHOLDER}', (code,))
+    c.execute('SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
     result = c.fetchone()
     conn.close()
 
@@ -420,7 +576,7 @@ def use_code(code):
     """使用验证码（扣减次数）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute(f'UPDATE verification_codes SET used_count = used_count + 1 WHERE code = {PLACEHOLDER}', (code,))
+    c.execute('UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
     conn.commit()
     conn.close()
 
@@ -429,9 +585,9 @@ def log_generation(code, style, original_image, result_image, ip_address=None, u
     """记录生成历史（包含IP和用户代理）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute(f'''
+    c.execute('''
         INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
-        VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        VALUES (?, ?, ?, ?, ?, ?)
     ''', (code, style, original_image, result_image, ip_address, user_agent))
     conn.commit()
     conn.close()
@@ -441,9 +597,9 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
     """记录验证尝试（用于安全审计）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute(f'''
+    c.execute('''
         INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
-        VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        VALUES (?, ?, ?, ?)
     ''', (code, ip_address, success, failure_reason))
     conn.commit()
     conn.close()
@@ -465,10 +621,6 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     from PIL import Image, ImageFilter, ImageEnhance
 
     # ==================== 读取并编码图片 ====================
-    # 检测图片格式
-    img_format = Image.open(image_path).format
-    mime_type = f"image/{img_format.lower()}" if img_format else "image/jpeg"
-
     with open(image_path, 'rb') as f:
         image_data = base64.b64encode(f.read()).decode()
 
@@ -567,94 +719,6 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     print(prompt_text)
     print("=" * 70)
 
-    # ==================== 生成英文Instructional Prompting（可选） ====================
-    if PROMPT_LANGUAGE == 'en':
-        # 服装映射（英文）
-        clothing_en = {
-            'business_suit': 'professional business suit',
-            'formal_dress': 'formal dress attire',
-            'casual_shirt': 'casual button-down shirt',
-            'turtleneck': 'elegant turtleneck sweater',
-            'tshirt': 'simple minimalist t-shirt',
-        }
-
-        # 背景映射（英文）
-        background_en_map = {
-            'textured': f'textured studio background in {color_desc} tones, soft professional lighting, subtle bokeh',
-            'solid': f'clean solid {color_desc} background, uniform and minimal'
-        }
-
-        # 美颜映射（英文）
-        beautify_en = {
-            'yes': 'SUBTLE BEAUTIFICATION: natural skin brightening, refined texture, maintain realistic proportions',
-            'no': 'NO RETOUCHING: preserve authentic appearance without enhancements'
-        }
-
-        # 角度映射（英文）
-        angle_en = {
-            'front': 'front-facing, looking directly at camera',
-            'slight_tilt': 'slight tilt angle, body slightly turned, face forward'
-        }
-
-        bg_desc_en = background_en_map.get(background, background_en_map['textured'])
-        angle_desc_en = angle_en.get(angle, angle_en['front'])
-        beautify_desc_en = beautify_en.get(beautify, beautify_en['no'])
-        clothing_desc_en = clothing_en.get(clothing, clothing_en['business_suit'])
-
-        # 生成英文Instructional Prompt
-        prompt_text = f"""GENERATE A PROFESSIONAL PORTRAIT PHOTO USING THE FOLLOWING INSTRUCTIONS:
-
-TASK: Image-to-Image Transformation
-Create a new professional portrait by changing clothing and background while preserving facial identity.
-
-SUBJECT REQUIREMENTS:
-- MAINTAIN exact facial features and hairstyle from reference
-- PRESERVE gender and age characteristics
-- OPTIMIZE skin tone lighting for professional look
-- {beautify_desc_en}
-
-CLOTHING INSTRUCTIONS:
-- DRESS subject in {clothing_desc_en}
-- ENSURE proper fit with natural draping
-- CREATE realistic appearance with appropriate textures
-
-BACKGROUND INSTRUCTIONS:
-- REPLACE original background completely
-- USE {bg_desc_en}
-- MAINTAIN clean and professional aesthetic
-
-COMPOSITION AND STYLE:
-- COMPOSE professional American-style portrait
-- POSITION subject in {angle_desc_en}
-- DIRECT subject to stand tall with military-grade posture
-- SET ultra-high 2K resolution with sharp focus
-- FRAME at 3:4 aspect ratio (2048x2730 pixels)
-- LIGHT with studio-grade lighting setup
-- CREATE elegant and balanced composition
-
-CRITICAL CONSTRAINTS:
-- DO NOT return the original image
-- DO NOT apply simple filters or color adjustments
-- MUST generate a completely new image
-- MUST visibly differ from original: different clothing, background, lighting
-
-QUALITY VERIFICATION:
-Generated image MUST show clear differences:
-1. Different clothing ({clothing_desc_en})
-2. Different background ({bg_desc_en})
-3. Professional studio-quality lighting
-
-TECHNICAL SPECIFICATIONS:
-- Resolution: 2048x2730 pixels (2K)
-- Aspect Ratio: 3:4
-- Format: Portrait photography
-- Style: Professional corporate headshot
-- Strength: 0.75 (high transformation)"""
-
-        print("=" * 70)
-        print("🌍 Using English Instructional Prompting")
-        print("=" * 70)
-
     # ==================== 构建请求 payload ====================
     # 添加随机种子以确保每次生成不同的图片
     import time
@@ -668,25 +732,20 @@ TECHNICAL SPECIFICATIONS:
             "contents": [{
                 "parts": [
                     {"text": prompt_text},
-                    {"inline_data": {"mime_type": mime_type, "data": image_data}}
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
                 ]
             }],
             "generationConfig": {
                 "temperature": 0.9,
                 "topP": 0.95,
                 "responseModalities": ["IMAGE"],
-                "imageFormat": "PNG",
-                # 添加重绘幅度参数（关键修复！）
-                "sampleCount": 1,
-                "aspectRatio": "3:4"
+                "imageFormat": "PNG"
             }
         }
         api_format_name = "Gemini 原生格式"
         payload_type = "Gemini contents/parts 格式"
     else:
         # OpenAI 兼容格式
-        # 注意：某些 API 可能不支持 strength/guidance_scale 参数
-        # 如果生成效果不好，可以尝试移除这些参数
         payload = {
             "model": MODEL_NAME,
             "messages": [
@@ -694,7 +753,7 @@ TECHNICAL SPECIFICATIONS:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt_text},
-                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_data}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
                     ]
                 }
             ],
@@ -702,8 +761,6 @@ TECHNICAL SPECIFICATIONS:
             "top_p": 0.95,
             "seed": random_seed,
             "max_tokens": 4096
-            # 注意：strength/guidance_scale 参数在 OpenAI 格式下可能无效
-            # 如需使用，请确认你的 API 提供商支持这些参数
         }
         api_format_name = "OpenAI 兼容格式"
         payload_type = "OpenAI chat/completions 格式"
@@ -717,16 +774,6 @@ TECHNICAL SPECIFICATIONS:
     print(f"  图片数据大小: {len(image_data)} 字符 (base64)")
     print(f"  Payload 结构: {payload_type}")
     print("-" * 70)
-
-    # 验证payload中的关键参数
-    if API_FORMAT != 'gemini':
-        print("[验证] Payload关键参数:")
-        print(f"  - model: {payload.get('model')}")
-        print(f"  - temperature: {payload.get('temperature')}")
-        print(f"  - seed: {payload.get('seed')}")
-        print(f"  - max_tokens: {payload.get('max_tokens')}")
-        print("-" * 70)
-
     print("📤 Prompt 内容 (发送给 API):")
     print(prompt_text)
     print("=" * 70)
@@ -734,11 +781,6 @@ TECHNICAL SPECIFICATIONS:
     # ========== 真实 API 调用部分 ==========
     api_key = os.getenv('NANOBANANA_API_KEY', '')
     api_url = NANOBANANA_API_URL
-
-    # 记录 API 调用开始
-    last_api_call['called'] = True
-    last_api_call['url'] = api_url
-    last_api_call['timestamp'] = datetime.now().isoformat()
 
     # 检查 API Key 是否配置
     if api_key:
@@ -748,72 +790,48 @@ TECHNICAL SPECIFICATIONS:
         print(f"[API] API Key 已配置 (长度: {len(api_key)} 字符)")
         print(f"[API] 模型: {MODEL_NAME}")
         print(f"[API] API URL: {api_url}")
+        print(f"[API] 连接超时: {CONNECT_TIMEOUT}秒")
+        print(f"[API] 读取超时: {READ_TIMEOUT}秒")
+        if PROXIES:
+            print(f"[API] 代理配置: {PROXIES}")
         print(f"[API] ================================================")
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
+
+        # 确认 payload 中的 prompt (OpenAI 格式)
+        payload_content = payload.get('messages', [{}])[0].get('content', [])
+        if isinstance(payload_content):
+            for item in payload_content:
+                if isinstance(item, dict) and item.get('type') == 'text':
+                    prompt_text_check = item.get('text', '')
+                    print(f"[API] ✅ Payload 中的 Prompt: {prompt_text_check[:50]}... (长度: {len(prompt_text_check)})")
+                    break
+
         try:
-            print(f"[API] 开始调用 API ({API_FORMAT.upper()} 格式)...")
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {api_key}'
-            }
+            # 使用新的网络请求函数
+            response, error = make_api_request(api_url, payload, headers)
 
-            # 使用 Session 来处理连接池和重试
-            session = requests.Session()
-            session.mount('https://', requests.adapters.HTTPAdapter(
-                max_retries=3,
-                pool_connections=1,
-                pool_maxsize=1
-            ))
-
-            print(f"[API] 请求 URL: {api_url}")
-            print(f"[API] 模型: {MODEL_NAME}")
-            print(f"[API] 请求超时: 120秒")
-            # 确认 payload 中的 prompt (OpenAI 格式)
-            payload_content = payload.get('messages', [{}])[0].get('content', [])
-            if isinstance(payload_content, list):
-                for item in payload_content:
-                    if item.get('type') == 'text':
-                        prompt_text_check = item.get('text', '')
-                        print(f"[API] ✅ Payload 中的 Prompt: {prompt_text_check[:50]}... (长度: {len(prompt_text_check)})")
-                        break
-
-            # 捕获所有可能的异常
-            try:
-                response = session.post(api_url, json=payload, headers=headers, timeout=120)
-            except requests.exceptions.Timeout as e:
-                print(f"[API] ❌ 请求超时: {e}")
-                last_api_call['error'] = f'请求超时（120秒）'
-                last_api_call['status_code'] = 408
-                raise Exception(f"API 请求超时，请稍后重试")
-            except requests.exceptions.ConnectionError as e:
-                print(f"[API] ❌ 连接错误: {e}")
-                last_api_call['error'] = f'连接失败: {str(e)}'
-                last_api_call['status_code'] = 503
-                raise Exception(f"无法连接到 API 服务器，请检查网络配置")
-            except (SystemExit, KeyboardInterrupt) as e:
-                print(f"[API] ❌ 进程退出: {e}")
-                last_api_call['error'] = f'进程意外退出'
-                last_api_call['status_code'] = 500
-                raise Exception(f"API 调用被中断")
-            except Exception as e:
-                print(f"[API] ❌ 请求失败: {type(e).__name__}: {e}")
-                last_api_call['error'] = f'{type(e).__name__}: {str(e)}'
-                last_api_call['status_code'] = 500
-                raise
-
-            print(f"[API] 响应状态码: {response.status_code}")
-
-            # 检查 HTTP 状态码
-            if response.status_code != 200:
-                error_text = response.text[:500]
-                print(f"[API] HTTP 错误响应: {error_text}")
-                last_api_call['error'] = f'HTTP {response.status_code}: {error_text}'
-                raise Exception(f"API 返回错误 {response.status_code}: {error_text[:100]}")
+            if error:
+                last_api_call['error'] = error
+                raise Exception(f"API 调用失败: {error}")
 
             # 保存调试信息
             last_api_call['called'] = True
             last_api_call['url'] = api_url
             last_api_call['status_code'] = response.status_code
             last_api_call['timestamp'] = datetime.now().isoformat()
+            last_api_call['response_time'] = f"{response.elapsed.total_seconds():.2f}s"
+
+            # 检查 HTTP 状态码
+            if response.status_code != 200:
+                error_text = response.text[:500]
+                print(f"[API] HTTP 错误响应: {error_text}")
+                last_api_call['error'] = f'HTTP {response.status_code}: {error_text}'
+                record_api_failure()
+                raise Exception(f"API 返回错误 {response.status_code}: {error_text[:100]}")
 
             if response.status_code == 200:
                 result = response.json()
@@ -841,16 +859,9 @@ TECHNICAL SPECIFICATIONS:
                             if isinstance(content, str):
                                 print(f"[API] Content 长度: {len(content)}")
                                 print(f"[API] Content 预览: {content[:200]}...")
-                                
-                                # 检查是否是纯文本响应（不是图片）
-                                if content.strip().startswith(('你好', '您好', 'Hello', '你好！', 'This', 'The', '我', '你')) or len(content) > 1000 and 'base64' not in content:
-                                    print(f"[API] ⚠️ API 返回了文本而不是图片！")
-                                    print(f"[API] 文本内容: {content[:500]}...")
-                                    last_api_call['error'] = f'API返回文本而非图片: {content[:200]}'
-                                    # 不抛出异常，让代码进入模拟模式
-                                    
+
                                 # 检查是否是 base64 编码的图片 (data:image/...;base64,...)
-                                elif content.startswith('data:image') and 'base64' in content:
+                                if content.startswith('data:image') and 'base64' in content:
                                     import base64
                                     # 提取 base64 数据
                                     base64_data = content.split('base64,')[-1]
@@ -878,7 +889,7 @@ TECHNICAL SPECIFICATIONS:
                                     print(f"[API] ✓ OpenAI 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'openai_base64'
-                                    return result_path, True  # API成功生成
+                                    return result_path
 
                 # ========== 处理 Gemini API 响应格式 (向后兼容) ==========
                 # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
@@ -920,7 +931,7 @@ TECHNICAL SPECIFICATIONS:
                                     print(f"[API] ✓ Gemini 图片生成成功: {result_path}")
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'gemini'
-                                    return result_path, True  # API成功生成
+                                    return result_path
                                 else:
                                     print(f"[API] Part {i} 没有 inlineData")
                         else:
@@ -939,7 +950,7 @@ TECHNICAL SPECIFICATIONS:
                     print(f"[API] ✓ 图片生成成功 (base64格式): {result_path}")
                     last_api_call['success'] = True
                     last_api_call['format'] = 'base64'
-                    return result_path, True  # API成功生成
+                    return result_path
 
                 # 格式2: {"url": "https://..."}
                 elif 'url' in result:
@@ -951,7 +962,7 @@ TECHNICAL SPECIFICATIONS:
                         print(f"[API] ✓ 图片下载成功 (URL格式): {result_path}")
                         last_api_call['success'] = True
                         last_api_call['format'] = 'url'
-                        return result_path, True  # API成功生��
+                        return result_path
                     else:
                         print(f"[API] 下载图片失败: {img_response.status_code}")
                         last_api_call['error'] = f'下载失败: {img_response.status_code}'
@@ -959,10 +970,6 @@ TECHNICAL SPECIFICATIONS:
                 print(f"[API] ⚠ 未知响应格式，使用模拟模式")
                 print(f"[API] 完整响应: {json.dumps(result, ensure_ascii=False)[:800]}")
                 last_api_call['error'] = '未知响应格式'
-            else:
-                print(f"[API] ✗ API 调用失败: {response.status_code}")
-                print(f"[API] 错误内容: {response.text[:500]}")
-                last_api_call['error'] = f'状态码: {response.status_code}, 内容: {response.text[:200]}'
 
         except Exception as e:
             print(f"[API] ✗ API 调用异常: {type(e).__name__}: {e}")
@@ -972,7 +979,7 @@ TECHNICAL SPECIFICATIONS:
             last_api_call['error'] = f'{type(e).__name__}: {str(e)}'
     else:
         print(f"[API] ⚠ API Key 未配置，使用模拟模式")
-        print(f"[API] 提示: 请在 Railway Variables 中设置 NANOBANANA_API_KEY")
+        print(f"[API] 提示: 请在 .env 文件中设置 NANOBANANA_API_KEY")
         last_api_call['error'] = 'API Key 未配置'
 
     # ========== 模拟模式：对图片进行简单处理 ==========
@@ -1040,11 +1047,11 @@ TECHNICAL SPECIFICATIONS:
         beauty_text = '轻微美颜' if beautify == 'yes' else '无美颜'
         print(f"  风格: {style}, 服装: {clothing}, 背景: {bg_type_text}({bg_color_text}), 美颜: {beauty_text}")
 
-        return result_path, False  # 模拟模式，API未成功生成
+        return result_path
 
     except Exception as e:
         print(f"图片处理失败: {e}")
-        return image_path, False  # 失败时返回原图
+        return image_path  # 失败时返回原图
 
 
 # ==================== 路由 ====================
@@ -1138,19 +1145,12 @@ def upload():
         print(f"[Upload] 开始处理上传: {filename}")
         print(f"[Upload] 配置: style={style}, clothing={clothing}, angle={angle}, bg={background}, color={bg_color}, beautify={beautify}")
 
-        result_path, api_success = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
 
-        print(f"[Upload] API 调用完成: {result_path}")
-        print(f"[Upload] API成功标志: {api_success}")
+        print(f"[Upload] API 调用成功: {result_path}")
 
-        # 只有API真正成功生成时才扣减使用次数
-        if api_success:
-            print(f"[Upload] API成功生成，扣减验证码次数")
-            use_code(code)
-            remaining_count = result['remaining'] - 1
-        else:
-            print(f"[Upload] API失败或使用模拟模式，不扣减验证码次数")
-            remaining_count = result['remaining']
+        # 扣减使用次数
+        use_code(code)
 
         # 记录日志（包含IP和用户代理）
         log_generation(code, f"{style}_{clothing}_{background}", filename, result_path, client_ip, user_agent)
@@ -1158,7 +1158,7 @@ def upload():
         return jsonify({
             'success': True,
             'result_url': f'/result/{result_path.split("/")[-1]}',
-            'remaining': remaining_count
+            'remaining': result['remaining'] - 1
         })
 
     except Exception as e:
@@ -1231,87 +1231,28 @@ def debug_api():
     return jsonify(last_api_call)
 
 
-@app.route('/debug/health')
-def debug_health():
-    """健康检查端点 - 全面检查系统状态"""
-    health_status = {
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'checks': {}
-    }
-
-    # 1. 数据库连接检查
-    try:
-        conn = get_db_connection()
-        c = get_db_cursor(conn)
-        if db_type == 'postgresql':
-            c.execute('SELECT version()')
-            version = c.fetchone()[0]
-            health_status['checks']['database'] = {
-                'status': 'ok',
-                'type': 'PostgreSQL',
-                'version': version[:50]
-            }
-        else:
-            c.execute('SELECT sqlite_version()')
-            version = c.fetchone()[0]
-            health_status['checks']['database'] = {
-                'status': 'ok',
-                'type': 'SQLite',
-                'version': version
-            }
-        conn.close()
-    except Exception as e:
-        health_status['checks']['database'] = {
-            'status': 'error',
-            'error': str(e)
-        }
-        health_status['status'] = 'unhealthy'
-
-    # 2. API Key 检查
-    api_key = os.getenv('NANOBANANA_API_KEY', '')
-    health_status['checks']['api_key'] = {
-        'status': 'configured' if api_key else 'missing',
-        'length': len(api_key) if api_key else 0
-    }
-
-    # 3. 上传目录检查
-    upload_exists = os.path.exists(upload_folder)
-    health_status['checks']['upload_folder'] = {
-        'status': 'ok' if upload_exists else 'warning',
-        'path': upload_folder,
-        'exists': upload_exists
-    }
-
-    # 4. 数据库表检查
-    try:
-        conn = get_db_connection()
-        c = get_db_cursor(conn)
-
-        if db_type == 'sqlite':
-            c.execute('SELECT name FROM sqlite_master WHERE type="table"')
-        else:
-            c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-
-        tables = [row[0] for row in c.fetchall()]
-        health_status['checks']['tables'] = {
-            'status': 'ok',
-            'count': len(tables),
-            'tables': tables
-        }
-        conn.close()
-    except Exception as e:
-        health_status['checks']['tables'] = {
-            'status': 'error',
-            'error': str(e)
-        }
-
-    # 5. 最后一次 API 调用状态
-    health_status['checks']['last_api_call'] = last_api_call
-
-    # 确定整体状态
-    status_code = 200 if health_status['status'] == 'healthy' else 503
-    return jsonify(health_status), status_code
+@app.route('/debug/network')
+def debug_network():
+    """调试端点 - 查看网络配置状态"""
+    return jsonify({
+        'api_provider': API_PROVIDER,
+        'api_url': NANOBANANA_API_URL,
+        'api_format': API_FORMAT,
+        'model_name': MODEL_NAME,
+        'proxy_configured': bool(PROXIES),
+        'proxies': PROXIES,
+        'connect_timeout': CONNECT_TIMEOUT,
+        'read_timeout': READ_TIMEOUT,
+        'circuit_breaker': {
+            'open': circuit_breaker['open'],
+            'failures': circuit_breaker['failures'],
+            'threshold': CIRCUIT_BREAKER_THRESHOLD,
+            'timeout': CIRCUIT_BREAKER_TIMEOUT,
+            'last_failure_time': circuit_breaker['last_failure_time']
+        },
+        'api_key_configured': bool(NANOBANANA_API_KEY),
+        'api_key_length': len(NANOBANANA_API_KEY) if NANOBANANA_API_KEY else 0
+    })
 
 
 @app.route('/api/status/<code>')
@@ -1324,36 +1265,20 @@ def status(code):
     # 获取生成历史
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute(f'''
+    c.execute('''
         SELECT style, created_at, result_image
         FROM generation_logs
-        WHERE code = {PLACEHOLDER}
+        WHERE code = ?
         ORDER BY created_at DESC
     ''', (code,))
     logs = c.fetchall()
     conn.close()
 
-    # 兼容多种数据库返回格式（字典或元组）
-    history = []
-    for row in logs:
-        if isinstance(row, dict):
-            history.append({
-                'style': row['style'],
-                'time': row['created_at'],
-                'result': row['result_image']
-            })
-        else:
-            history.append({
-                'style': row[0],
-                'time': row[1],
-                'result': row[2]
-            })
-
     return jsonify({
         'success': True,
         'remaining': result['remaining'],
         'max_uses': result['max_uses'],
-        'history': history
+        'history': [{'style': row[0], 'time': row[1], 'result': row[2]} for row in logs]
     })
 
 
@@ -1440,9 +1365,9 @@ def admin_generate_codes():
     for _ in range(count):
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         try:
-            c.execute(f'INSERT INTO verification_codes (code, max_uses) VALUES ({PLACEHOLDER}, {PLACEHOLDER})', (code, max_uses))
+            c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
             codes.append(code)
-        except Exception:
+        except sqlite3.IntegrityError:
             continue
 
     conn.commit()
@@ -1457,7 +1382,7 @@ def export_codes():
     """导出所有活跃验证码"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute(f'SELECT code FROM verification_codes WHERE status = {PLACEHOLDER} ORDER BY code', ('active',))
+    c.execute('SELECT code FROM verification_codes WHERE status = "active" ORDER BY code')
     codes = [row[0] for row in c.fetchall()]
     conn.close()
 
@@ -1495,11 +1420,7 @@ def export_security_logs():
     output = io.StringIO()
     output.write("验证码,IP地址,是否成功,失败原因,时间\n")
     for log in logs:
-        # 兼容字典和元组格式
-        if isinstance(log, dict):
-            output.write(f"{log.get('code', '') or ''},{log.get('ip_address', '') or ''},{log.get('success', False)},{log.get('failure_reason', '') or ''},{log.get('created_at', '')}\n")
-        else:
-            output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
+        output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
 
     from flask import Response
     return Response(
@@ -1523,7 +1444,7 @@ def batch_delete():
     c = get_db_cursor(conn)
 
     # 使用占位符构建IN查询
-    placeholders = ','.join([PLACEHOLDER for _ in codes])
+    placeholders = ','.join(['?' for _ in codes])
     c.execute(f'DELETE FROM verification_codes WHERE code IN ({placeholders})', codes)
 
     deleted = c.rowcount
@@ -1550,8 +1471,8 @@ def batch_update_status():
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    placeholders = ','.join([PLACEHOLDER for _ in codes])
-    c.execute(f'UPDATE verification_codes SET status = {PLACEHOLDER} WHERE code IN ({placeholders})', [status] + codes)
+    placeholders = ','.join(['?' for _ in codes])
+    c.execute(f'UPDATE verification_codes SET status = ? WHERE code IN ({placeholders})', [status] + codes)
 
     updated = c.rowcount
     conn.commit()
@@ -1573,7 +1494,7 @@ def reset_code():
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    c.execute(f'UPDATE verification_codes SET used_count = 0, status = {PLACEHOLDER} WHERE code = {PLACEHOLDER}', ('active', code))
+    c.execute('UPDATE verification_codes SET used_count = 0, status = "active" WHERE code = ?', (code,))
 
     if c.rowcount == 0:
         conn.close()

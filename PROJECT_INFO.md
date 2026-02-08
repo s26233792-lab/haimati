@@ -19,16 +19,16 @@
 
 | 配置项 | 当前值 |
 |--------|--------|
-| **API 提供商** | api.apicore.ai (推荐) |
-| **模型名称** | `gemini-3-pro-image-preview` |
-| **API 格式** | OpenAI 兼容格式 |
+| **API 提供商** | ismaque.org |
+| **模型名称** | `gemini-3-pro-image-preview-2k` |
+| **API 格式** | Gemini 原生格式 |
 | **输出分辨率** | **2K** (2048x2730 像素) |
 | **画面比例** | 3:4 |
 
 ### API 端点
 
 ```
-https://api.apicore.ai/v1/chat/completions
+https://ismaque.org/v1/models/gemini-3-pro-image-preview-2k:generateContent
 ```
 
 ---
@@ -46,8 +46,8 @@ https://api.apicore.ai/v1/chat/completions
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| `API_PROVIDER` | `apicore` | API 提供商 (apicore/laozhang/12ai) |
-| `MODEL_NAME` | `gemini-3-pro-image-preview` | 模型名称 |
+| `API_PROVIDER` | `12ai` | API 提供商 (12ai/laozhang) |
+| `MODEL_NAME` | `gemini-3-pro-image-preview-2k` | 模型名称 |
 | `ADMIN_USERNAME` | `admin` | 管理后台用户名 |
 | `ADMIN_PASSWORD` | `admin123` | 管理后台密码 |
 | `DATABASE_URL` | - | PostgreSQL 连接字符串（Railway 自动提供） |
