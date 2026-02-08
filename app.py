@@ -486,6 +486,25 @@ def get_db_cursor(conn):
         return conn.cursor()
 
 
+def execute_query(cursor, query, params=None):
+    """
+    执行 SQL 查询，自动处理占位符兼容性
+
+    PostgreSQL 使用 %s 占位符
+    SQLite 使用 ? 占位符
+    """
+    if params is None:
+        return cursor.execute(query)
+
+    if db_type == 'postgresql':
+        # 转换 SQLite 的 ? 占位符为 PostgreSQL 的 %s
+        # 并将参数中的字符串转换为正确的格式
+        converted_query = query.replace('?', '%s').replace('"', "'")
+        return cursor.execute(converted_query, params)
+    else:
+        return cursor.execute(query, params)
+
+
 def fetchall_rows(cursor):
     """获取所有行并包装为 RowProxy（兼容 PostgreSQL 和 SQLite）"""
     rows = cursor.fetchall()
@@ -593,7 +612,7 @@ def verify_code(code):
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    c.execute('SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
+    execute_query(c, 'SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
     result = c.fetchone()
     conn.close()
 
@@ -625,7 +644,7 @@ def use_code(code):
     """使用验证码（扣减次数）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
+    execute_query(c, 'UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
     conn.commit()
     conn.close()
 
@@ -634,10 +653,17 @@ def log_generation(code, style, original_image, result_image, ip_address=None, u
     """记录生成历史（包含IP和用户代理）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('''
-        INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (code, style, original_image, result_image, ip_address, user_agent))
+    # 根据数据库类型使用不同的占位符
+    if db_type == 'postgresql':
+        c.execute('''
+            INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (code, style, original_image, result_image, ip_address, user_agent))
+    else:
+        c.execute('''
+            INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (code, style, original_image, result_image, ip_address, user_agent))
     conn.commit()
     conn.close()
 
@@ -646,10 +672,17 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
     """记录验证尝试（用于安全审计）"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('''
-        INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
-        VALUES (?, ?, ?, ?)
-    ''', (code, ip_address, success, failure_reason))
+    # 根据数据库类型使用不同的占位符
+    if db_type == 'postgresql':
+        c.execute('''
+            INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
+            VALUES (%s, %s, %s, %s)
+        ''', (code, ip_address, success, failure_reason))
+    else:
+        c.execute('''
+            INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
+            VALUES (?, ?, ?, ?)
+        ''', (code, ip_address, success, failure_reason))
     conn.commit()
     conn.close()
 
@@ -1423,9 +1456,14 @@ def admin_generate_codes():
     for _ in range(count):
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         try:
-            c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
+            # 根据数据库类型使用不同的占位符
+            if db_type == 'postgresql':
+                c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (%s, %s)', (code, max_uses))
+            else:
+                c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
             codes.append(code)
-        except sqlite3.IntegrityError:
+        except Exception:
+            # 捕获所有数据库唯一性约束错误（兼容 PostgreSQL 和 SQLite）
             continue
 
     conn.commit()
@@ -1440,8 +1478,9 @@ def export_codes():
     """导出所有活跃验证码"""
     conn = get_db_connection()
     c = get_db_cursor(conn)
-    c.execute('SELECT code FROM verification_codes WHERE status = "active" ORDER BY code')
-    codes = [row[0] for row in c.fetchall()]
+    c.execute("SELECT code FROM verification_codes WHERE status = 'active' ORDER BY code")
+    # 兼容 PostgreSQL（返回字典）和 SQLite（返回元组）
+    codes = [row['code'] if isinstance(row, dict) else row[0] for row in c.fetchall()]
     conn.close()
 
     # 返回文本文件
@@ -1529,8 +1568,10 @@ def batch_update_status():
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    placeholders = ','.join(['?' for _ in codes])
-    c.execute(f'UPDATE verification_codes SET status = ? WHERE code IN ({placeholders})', [status] + codes)
+    # 根据数据库类型使用不同的占位符
+    placeholder_char = '%s' if db_type == 'postgresql' else '?'
+    placeholders = ','.join([placeholder_char for _ in codes])
+    c.execute(f'UPDATE verification_codes SET status = {placeholder_char} WHERE code IN ({placeholders})', [status] + codes)
 
     updated = c.rowcount
     conn.commit()
@@ -1552,7 +1593,7 @@ def reset_code():
     conn = get_db_connection()
     c = get_db_cursor(conn)
 
-    c.execute('UPDATE verification_codes SET used_count = 0, status = "active" WHERE code = ?', (code,))
+    execute_query(c, 'UPDATE verification_codes SET used_count = 0, status = \'active\' WHERE code = ?', (code,))
 
     if c.rowcount == 0:
         conn.close()
