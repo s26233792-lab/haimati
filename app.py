@@ -1082,7 +1082,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         'white': (255, 255, 255),
         'gray': (200, 200, 210),      # 质感影棚用稍浅的灰色
         'blue': (180, 200, 230),       # 柔和的蓝色
-        'black': (70, 70, 80),         # 深灰色
+        'pink': (255, 220, 230),       # 柔和粉色
         'warm': (245, 235, 210)        # 暖米色
     }
 
@@ -1091,7 +1091,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         'white': (255, 255, 255),
         'gray': (233, 236, 239),
         'blue': (187, 222, 251),
-        'black': (52, 58, 64),
+        'pink': (248, 187, 208),       # 柔和粉色
         'warm': (255, 236, 179)
     }
 
