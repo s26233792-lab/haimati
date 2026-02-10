@@ -714,6 +714,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         'casual_shirt': '休闲衬衫',
         'turtleneck': '高领毛衣',
         'tshirt': '简约T恤',
+        'doctoral_gown': '博士学位服（含学位帽、垂布、长袍）',
         'keep_original': '和原图保持一致'
     }
 
