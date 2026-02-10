@@ -29,6 +29,9 @@ uploads/
 *.png
 *.webp
 
+# Allow static images
+!static/images/
+
 # IDE
 .vscode/
 .idea/
