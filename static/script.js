@@ -229,6 +229,12 @@ async function generatePortrait() {
     generateBtn.disabled = true;
     progressArea.style.display = 'block';
 
+    // 更新进度提示文字
+    const progressMessage = progressArea.querySelector('p');
+    if (progressMessage) {
+        progressMessage.textContent = '⏳ AI 正在生成图片，这可能需要 1-2 分钟，请耐心等待...';
+    }
+
     // 准备表单数据
     const formData = new FormData();
     formData.append('image', selectedFile);
@@ -240,11 +246,22 @@ async function generatePortrait() {
     formData.append('bgColor', bgColor);
     formData.append('beautify', beautify);
 
+    // 创建超时 Promise (150秒超时)
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+            reject(new Error('timeout: 生成超时，图片处理需要较长时间，请稍后重试或联系客服'));
+        }, 150000);
+    });
+
     try {
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
+        // 使用 Promise.race 实现超时控制
+        const response = await Promise.race([
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            }),
+            timeoutPromise
+        ]);
 
         console.log('[API] 响应状态:', response.status);
         console.log('[API] 响应类型:', response.headers.get('content-type'));

@@ -902,6 +902,14 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                     break
 
         try:
+            # 提前记录 API 调用开始时间（防止超时导致记录丢失）
+            last_api_call['called'] = True
+            last_api_call['url'] = api_url
+            last_api_call['timestamp'] = datetime.now().isoformat()
+            last_api_call['status'] = 'calling'
+            last_api_call['error'] = None
+            print(f"[API] 开始调用 API: {api_url}")
+
             # 使用新的网络请求函数
             response, error = make_api_request(api_url, payload, headers)
 
