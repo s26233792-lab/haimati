@@ -610,81 +610,89 @@ def allowed_file(filename):
 def verify_code(code):
     """验证验证码并返回剩余次数"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
+    try:
+        c = get_db_cursor(conn)
 
-    execute_query(c, 'SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
-    result = c.fetchone()
-    conn.close()
+        execute_query(c, 'SELECT max_uses, used_count, status FROM verification_codes WHERE code = ?', (code,))
+        result = c.fetchone()
 
-    if not result:
-        return None, "验证码不存在"
+        if not result:
+            return None, "验证码不存在"
 
-    # 兼容多种数据库返回格式（元组、Row对象、字典）
-    if isinstance(result, dict):
-        max_uses = result['max_uses']
-        used_count = result['used_count']
-        status = result['status']
-    else:
-        # 元组或Row对象，按索引访问
-        max_uses = result[0]
-        used_count = result[1]
-        status = result[2]
+        # 兼容多种数据库返回格式（元组、Row对象、字典）
+        if isinstance(result, dict):
+            max_uses = result['max_uses']
+            used_count = result['used_count']
+            status = result['status']
+        else:
+            # 元组或Row对象，按索引访问
+            max_uses = result[0]
+            used_count = result[1]
+            status = result[2]
 
-    if status != 'active':
-        return None, "验证码已失效"
+        if status != 'active':
+            return None, "验证码已失效"
 
-    remaining = max_uses - used_count
-    if remaining <= 0:
-        return None, "验证码使用次数已用完"
+        remaining = max_uses - used_count
+        if remaining <= 0:
+            return None, "验证码使用次数已用完"
 
-    return {'max_uses': max_uses, 'used_count': used_count, 'remaining': remaining}, None
+        return {'max_uses': max_uses, 'used_count': used_count, 'remaining': remaining}, None
+    finally:
+        conn.close()
 
 
 def use_code(code):
     """使用验证码（扣减次数）"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    execute_query(c, 'UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
-    conn.commit()
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        execute_query(c, 'UPDATE verification_codes SET used_count = used_count + 1 WHERE code = ?', (code,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def log_generation(code, style, original_image, result_image, ip_address=None, user_agent=None):
     """记录生成历史（包含IP和用户代理）"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    # 根据数据库类型使用不同的占位符
-    if db_type == 'postgresql':
-        c.execute('''
-            INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        ''', (code, style, original_image, result_image, ip_address, user_agent))
-    else:
-        c.execute('''
-            INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (code, style, original_image, result_image, ip_address, user_agent))
-    conn.commit()
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        # 根据数据库类型使用不同的占位符
+        if db_type == 'postgresql':
+            c.execute('''
+                INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            ''', (code, style, original_image, result_image, ip_address, user_agent))
+        else:
+            c.execute('''
+                INSERT INTO generation_logs (code, style, original_image, result_image, ip_address, user_agent)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (code, style, original_image, result_image, ip_address, user_agent))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def log_verification_attempt(code, ip_address, success, failure_reason=None):
     """记录验证尝试（用于安全审计）"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    # 根据数据库类型使用不同的占位符
-    if db_type == 'postgresql':
-        c.execute('''
-            INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
-            VALUES (%s, %s, %s, %s)
-        ''', (code, ip_address, success, failure_reason))
-    else:
-        c.execute('''
-            INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
-            VALUES (?, ?, ?, ?)
-        ''', (code, ip_address, success, failure_reason))
-    conn.commit()
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        # 根据数据库类型使用不同的占位符
+        if db_type == 'postgresql':
+            c.execute('''
+                INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
+                VALUES (%s, %s, %s, %s)
+            ''', (code, ip_address, success, failure_reason))
+        else:
+            c.execute('''
+                INSERT INTO verification_attempts (code, ip_address, success, failure_reason)
+                VALUES (?, ?, ?, ?)
+            ''', (code, ip_address, success, failure_reason))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color='white', beautify='no'):
@@ -925,7 +933,16 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 last_api_call['response_keys'] = list(result.keys())
                 last_api_call['raw_response'] = json.dumps(result, ensure_ascii=False)[:2000]  # 保存更多原始响应
                 last_api_call['error'] = None
-                last_api_call['content_type'] = str(type(result.get('choices', [{}])[0].get('message', {}).get('content', 'N/A'))) if 'choices' in result and len(result['choices']) > 0 else 'N/A'
+
+                # 安全地获取 content_type
+                content_type = 'N/A'
+                if 'choices' in result and len(result['choices']) > 0:
+                    try:
+                        content = result['choices'][0].get('message', {}).get('content', 'N/A')
+                        content_type = str(type(content))
+                    except (KeyError, IndexError, AttributeError):
+                        content_type = 'unknown'
+                last_api_call['content_type'] = content_type
 
                 # ========== 处理 OpenAI 兼容响应格式 ==========
                 # OpenAI 格式: {"choices": [{"message": {"content": "..."}}]}
@@ -1471,20 +1488,22 @@ def admin_logout():
 def admin():
     """管理后台"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
-    codes = fetchall_rows(c)  # 使用 RowProxy 包装
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
+        codes = fetchall_rows(c)  # 使用 RowProxy 包装
 
-    # 预处理统计数据（替代 Jinja2 selectattr 过滤器）
-    stats = {
-        'total': len(codes),
-        'new': sum(1 for code in codes if code.used_count == 0),
-        'used': sum(1 for code in codes if code.used_count > 0),
-        'total_uses': sum(code.used_count for code in codes)
-    }
+        # 预处理统计数据（替代 Jinja2 selectattr 过滤器）
+        stats = {
+            'total': len(codes),
+            'new': sum(1 for code in codes if code.used_count == 0),
+            'used': sum(1 for code in codes if code.used_count > 0),
+            'total_uses': sum(code.used_count for code in codes)
+        }
 
-    return render_template('admin.html', codes=codes, stats=stats)
+        return render_template('admin.html', codes=codes, stats=stats)
+    finally:
+        conn.close()
 
 
 @app.route('/admin/generate_codes', methods=['POST'])
@@ -1496,26 +1515,27 @@ def admin_generate_codes():
     max_uses = data.get('max_uses', 3)
 
     conn = get_db_connection()
-    c = get_db_cursor(conn)
+    try:
+        c = get_db_cursor(conn)
 
-    codes = []
-    for _ in range(count):
-        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        try:
-            # 根据数据库类型使用不同的占位符
-            if db_type == 'postgresql':
-                c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (%s, %s)', (code, max_uses))
-            else:
-                c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
-            codes.append(code)
-        except Exception:
-            # 捕获所有数据库唯一性约束错误（兼容 PostgreSQL 和 SQLite）
-            continue
+        codes = []
+        for _ in range(count):
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            try:
+                # 根据数据库类型使用不同的占位符
+                if db_type == 'postgresql':
+                    c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (%s, %s)', (code, max_uses))
+                else:
+                    c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
+                codes.append(code)
+            except Exception:
+                # 捕获所有数据库唯一性约束错误（兼容 PostgreSQL 和 SQLite）
+                continue
 
-    conn.commit()
-    conn.close()
-
-    return jsonify({'success': True, 'codes': codes, 'count': len(codes)})
+        conn.commit()
+        return jsonify({'success': True, 'codes': codes, 'count': len(codes)})
+    finally:
+        conn.close()
 
 
 @app.route('/admin/export_codes')
@@ -1523,24 +1543,26 @@ def admin_generate_codes():
 def export_codes():
     """导出所有活跃验证码"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    c.execute("SELECT code FROM verification_codes WHERE status = 'active' ORDER BY code")
-    # 兼容 PostgreSQL（返回字典）和 SQLite（返回元组）
-    codes = [row['code'] if isinstance(row, dict) else row[0] for row in c.fetchall()]
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        c.execute("SELECT code FROM verification_codes WHERE status = 'active' ORDER BY code")
+        # 兼容 PostgreSQL（返回字典）和 SQLite（返回元组）
+        codes = [row['code'] if isinstance(row, dict) else row[0] for row in c.fetchall()]
 
-    # 返回文本文件
-    import io
-    output = io.StringIO()
-    for code in codes:
-        output.write(f"{code}\n")
+        # 返回文本文件
+        import io
+        output = io.StringIO()
+        for code in codes:
+            output.write(f"{code}\n")
 
-    from flask import Response
-    return Response(
-        output.getvalue(),
-        mimetype='text/plain',
-        headers={'Content-Disposition': 'attachment; filename=verification_codes.txt'}
-    )
+        from flask import Response
+        return Response(
+            output.getvalue(),
+            mimetype='text/plain',
+            headers={'Content-Disposition': 'attachment; filename=verification_codes.txt'}
+        )
+    finally:
+        conn.close()
 
 
 @app.route('/admin/export_security_logs')
@@ -1548,29 +1570,31 @@ def export_codes():
 def export_security_logs():
     """导出安全审计日志"""
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    c.execute('''
-        SELECT code, ip_address, success, failure_reason, created_at
-        FROM verification_attempts
-        ORDER BY created_at DESC
-        LIMIT 1000
-    ''')
-    logs = c.fetchall()
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        c.execute('''
+            SELECT code, ip_address, success, failure_reason, created_at
+            FROM verification_attempts
+            ORDER BY created_at DESC
+            LIMIT 1000
+        ''')
+        logs = c.fetchall()
 
-    # 返回CSV文件
-    import io
-    output = io.StringIO()
-    output.write("验证码,IP地址,是否成功,失败原因,时间\n")
-    for log in logs:
-        output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
+        # 返回CSV文件
+        import io
+        output = io.StringIO()
+        output.write("验证码,IP地址,是否成功,失败原因,时间\n")
+        for log in logs:
+            output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
 
-    from flask import Response
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=security_logs.csv'}
-    )
+        from flask import Response
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=security_logs.csv'}
+        )
+    finally:
+        conn.close()
 
 
 @app.route('/admin/batch_delete', methods=['POST'])
@@ -1584,17 +1608,18 @@ def batch_delete():
         return jsonify({'success': False, 'message': '未选择验证码'}), 400
 
     conn = get_db_connection()
-    c = get_db_cursor(conn)
+    try:
+        c = get_db_cursor(conn)
 
-    # 使用占位符构建IN查询
-    placeholders = ','.join(['?' for _ in codes])
-    c.execute(f'DELETE FROM verification_codes WHERE code IN ({placeholders})', codes)
+        # 使用占位符构建IN查询
+        placeholders = ','.join(['?' for _ in codes])
+        c.execute(f'DELETE FROM verification_codes WHERE code IN ({placeholders})', codes)
 
-    deleted = c.rowcount
-    conn.commit()
-    conn.close()
-
-    return jsonify({'success': True, 'deleted': deleted})
+        deleted = c.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'deleted': deleted})
+    finally:
+        conn.close()
 
 
 @app.route('/admin/batch_update_status', methods=['POST'])
@@ -1612,18 +1637,19 @@ def batch_update_status():
         return jsonify({'success': False, 'message': '无效的状态'}), 400
 
     conn = get_db_connection()
-    c = get_db_cursor(conn)
+    try:
+        c = get_db_cursor(conn)
 
-    # 根据数据库类型使用不同的占位符
-    placeholder_char = '%s' if db_type == 'postgresql' else '?'
-    placeholders = ','.join([placeholder_char for _ in codes])
-    c.execute(f'UPDATE verification_codes SET status = {placeholder_char} WHERE code IN ({placeholders})', [status] + codes)
+        # 根据数据库类型使用不同的占位符
+        placeholder_char = '%s' if db_type == 'postgresql' else '?'
+        placeholders = ','.join([placeholder_char for _ in codes])
+        c.execute(f'UPDATE verification_codes SET status = {placeholder_char} WHERE code IN ({placeholders})', [status] + codes)
 
-    updated = c.rowcount
-    conn.commit()
-    conn.close()
-
-    return jsonify({'success': True, 'updated': updated})
+        updated = c.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'updated': updated})
+    finally:
+        conn.close()
 
 
 @app.route('/admin/reset_code', methods=['POST'])
@@ -1637,18 +1663,18 @@ def reset_code():
         return jsonify({'success': False, 'message': '未指定验证码'}), 400
 
     conn = get_db_connection()
-    c = get_db_cursor(conn)
+    try:
+        c = get_db_cursor(conn)
 
-    execute_query(c, 'UPDATE verification_codes SET used_count = 0, status = \'active\' WHERE code = ?', (code,))
+        execute_query(c, 'UPDATE verification_codes SET used_count = 0, status = \'active\' WHERE code = ?', (code,))
 
-    if c.rowcount == 0:
+        if c.rowcount == 0:
+            return jsonify({'success': False, 'message': '验证码不存在'}), 404
+
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
         conn.close()
-        return jsonify({'success': False, 'message': '验证码不存在'}), 404
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({'success': True})
 
 
 # ==================== 启动 ====================

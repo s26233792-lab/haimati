@@ -23,7 +23,8 @@ def generate_code(length=8):
 
 def generate_codes(count=100, max_uses=3):
     """批量生成验证码并保存到数据库"""
-    conn = sqlite3.connect('codes.db')
+    db_path = os.getenv('DATABASE_PATH', 'codes.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     # 创建表（如果不存在）
