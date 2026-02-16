@@ -1509,33 +1509,39 @@ def admin():
 @app.route('/admin/generate_codes', methods=['POST'])
 @admin_required
 def admin_generate_codes():
-    """批量生成验证码"""
-    data = request.json
-    count = data.get('count', 10)
-    max_uses = data.get('max_uses', 3)
-
-    conn = get_db_connection()
+    """批量生���验证码"""
     try:
-        c = get_db_cursor(conn)
+        data = request.json
+        count = data.get('count', 10)
+        max_uses = data.get('max_uses', 3)
 
-        codes = []
-        for _ in range(count):
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            try:
-                # 根据数据库类型使用不同的占位符
-                if db_type == 'postgresql':
-                    c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (%s, %s)', (code, max_uses))
-                else:
-                    c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
-                codes.append(code)
-            except Exception:
-                # 捕获所有数据库唯一性约束错误（兼容 PostgreSQL 和 SQLite）
-                continue
+        conn = get_db_connection()
+        try:
+            c = get_db_cursor(conn)
 
-        conn.commit()
-        return jsonify({'success': True, 'codes': codes, 'count': len(codes)})
-    finally:
-        conn.close()
+            codes = []
+            for _ in range(count):
+                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                try:
+                    # 根据数据库类型使用不同的占位符
+                    if db_type == 'postgresql':
+                        c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (%s, %s)', (code, max_uses))
+                    else:
+                        c.execute('INSERT INTO verification_codes (code, max_uses) VALUES (?, ?)', (code, max_uses))
+                    codes.append(code)
+                except Exception:
+                    # 捕获所有数据库唯一性约束错误（兼容 PostgreSQL 和 SQLite）
+                    continue
+
+            conn.commit()
+            return jsonify({'success': True, 'codes': codes, 'count': len(codes)})
+        finally:
+            conn.close()
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] admin_generate_codes failed: {e}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': f'生成失败: {str(e)}'}), 500
 
 
 @app.route('/admin/export_codes')
