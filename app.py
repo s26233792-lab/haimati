@@ -117,7 +117,7 @@ circuit_breaker = {
 API_BASE_URLS = {
     'laozhang': os.getenv('LAOZHANG_API_URL', 'https://api.laozhang.ai/v1'),
     # 12ai.org 多线路配置
-    '12ai': os.getenv('API_URL', 'https://new.12ai.org/v1'),      # 软银线路（默认）
+    '12ai': os.getenv('API_URL', 'https://cdn.12ai.org/v1'),      # CDN线路（默认）
     '12ai-hk': os.getenv('AI12ORG_HK_URL', 'https://hk.12ai.org/v1'),    # 香港线路
     '12ai-cdn': os.getenv('AI12ORG_CDN_URL', 'https://cdn.12ai.org/v1'), # CDN线路
     'custom': os.getenv('CUSTOM_API_URL', '')  # 支持自定义 API 端点
