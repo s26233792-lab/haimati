@@ -921,9 +921,11 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 print(f"[API] 响应键: {list(result.keys())}")
                 print(f"[API] 响应内容预览: {json.dumps(result, ensure_ascii=False)[:400]}...")
 
-                # 保存响应信息
+                # 先保存原始响应信息（无论解析是否成功，方便调试）
                 last_api_call['response_keys'] = list(result.keys())
+                last_api_call['raw_response'] = json.dumps(result, ensure_ascii=False)[:2000]  # 保存更多原始响应
                 last_api_call['error'] = None
+                last_api_call['content_type'] = str(type(result.get('choices', [{}])[0].get('message', {}).get('content', 'N/A'))) if 'choices' in result and len(result['choices']) > 0 else 'N/A'
 
                 # ========== 处理 OpenAI 兼容响应格式 ==========
                 # OpenAI 格式: {"choices": [{"message": {"content": "..."}}]}
@@ -938,7 +940,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                             content = message['content']
                             print(f"[API] Content 类型: {type(content)}")
 
-                            # 检查 content 是否包含图片数据
+                            # 格式1: content 是字符串（直接 base64）
                             if isinstance(content, str):
                                 print(f"[API] Content 长度: {len(content)}")
                                 print(f"[API] Content 预览: {content[:200]}...")
@@ -973,6 +975,48 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                                     last_api_call['success'] = True
                                     last_api_call['format'] = 'openai_base64'
                                     return result_path
+
+                            # 格式2: content 是数组（OpenAI 多模态格式）
+                            elif isinstance(content, list):
+                                print(f"[API] Content 是数组格式，长度: {len(content)}")
+                                for i, item in enumerate(content):
+                                    print(f"[API] Content[{i}] 类型: {type(item)}, 键: {list(item.keys()) if isinstance(item, dict) else 'N/A'}")
+                                    if isinstance(item, dict):
+                                        # 检查 image_url 类型
+                                        if item.get('type') == 'image_url':
+                                            url = item.get('image_url', {}).get('url', '')
+                                            print(f"[API] 找到 image_url，长度: {len(url)}")
+                                            if url.startswith('data:image') and 'base64' in url:
+                                                import base64
+                                                # 提取 base64 数据
+                                                base64_data = url.split('base64,')[-1]
+                                                image_data = base64.b64decode(base64_data)
+                                                result_path = image_path.replace('.', '_result.')
+
+                                                # 检查图片大小
+                                                original_size = os.path.getsize(image_path)
+                                                print(f"[API] 原图大小: {original_size} bytes")
+                                                print(f"[API] 生成图片大小: {len(image_data)} bytes")
+
+                                                # 检查是否和原图大小相同
+                                                if abs(len(image_data) - original_size) < 100:
+                                                    print(f"[API] ❌ 错误: 生成图片大小与原图几乎相同！")
+                                                    last_api_call['error'] = 'API返回了原图而非生成的图片'
+                                                    raise Exception("API返回了原图，图片生成失败。")
+
+                                                with open(result_path, 'wb') as f:
+                                                    f.write(image_data)
+
+                                                saved_size = os.path.getsize(result_path)
+                                                print(f"[API] 保存后大小: {saved_size} bytes")
+
+                                                print(f"[API] ✓ OpenAI 数组格式图片生成成功: {result_path}")
+                                                last_api_call['success'] = True
+                                                last_api_call['format'] = 'openai_array'
+                                                return result_path
+                                        else:
+                                            print(f"[API] Content[{i}] 类型: {item.get('type', 'unknown')}")
+                                print(f"[API] ⚠ 数组中未找到有效的图片数据")
 
                 # ========== 处理 Gemini API 响应格式 (向后兼容) ==========
                 # Gemini 格式: {"candidates": [{"content": {"parts": [{"inlineData": {"data": "base64..."}}]}}]}
@@ -1051,8 +1095,9 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                         last_api_call['error'] = f'下载失败: {img_response.status_code}'
 
                 print(f"[API] ⚠ 未知响应格式，使用模拟模式")
-                print(f"[API] 完整响应: {json.dumps(result, ensure_ascii=False)[:800]}")
-                last_api_call['error'] = '未知响应格式'
+                print(f"[API] 响应键: {list(result.keys())}")
+                print(f"[API] 完整响应: {json.dumps(result, ensure_ascii=False)[:1500]}")
+                last_api_call['error'] = f'未知响应格式。响应键: {list(result.keys())}'
 
         except Exception as e:
             print(f"[API] ✗ API 调用异常: {type(e).__name__}: {e}")
