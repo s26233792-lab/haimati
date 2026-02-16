@@ -290,6 +290,21 @@ async function generatePortrait() {
             // 显示结果
             resultImage.src = data.result_url;
 
+            // 添加加载错误处理
+            resultImage.onerror = function() {
+                console.error('[Result] 图片加载失败:', data.result_url);
+                step2Error.textContent = '⚠️ 图片加载失败，请联系客服或重试';
+                step2Error.style.display = 'block';
+                generateBtn.disabled = false;
+                step3.style.display = 'none';
+                step2.style.display = 'block';
+            };
+
+            // 加载成功后移除错误处理
+            resultImage.onload = function() {
+                console.log('[Result] 图片加载成功');
+            };
+
             // 设置下载链接（使用时间戳作为文件名）
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
             downloadLink.href = data.result_url;

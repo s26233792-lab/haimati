@@ -1302,7 +1302,20 @@ def upload():
 
         print(f"[Upload] API 调用成功: {result_path}")
 
-        # 扣减使用次数
+        # 验证文件是否存在且可读
+        if not os.path.exists(result_path):
+            print(f"[Upload] 错误: 生成的文件不存在: {result_path}")
+            return jsonify({'success': False, 'message': '生成失败：文件未正确保存'}), 500
+
+        # 验证文件大小（确保不是空文件）
+        file_size = os.path.getsize(result_path)
+        if file_size == 0:
+            print(f"[Upload] 错误: 生成的文件为空: {result_path}")
+            return jsonify({'success': False, 'message': '生成失败：文件为空'}), 500
+
+        print(f"[Upload] 文件验证成功: {result_path} ({file_size} bytes)")
+
+        # 扣减使用次数（只在文件验证成功后）
         use_code(code)
 
         # 记录日志（包含IP和用户代理）
@@ -1310,7 +1323,7 @@ def upload():
 
         return jsonify({
             'success': True,
-            'result_url': f'/result/{result_path.split("/")[-1]}',
+            'result_url': f'/result/{os.path.basename(result_path)}',
             'remaining': result['remaining'] - 1
         })
 
@@ -1325,8 +1338,17 @@ def upload():
 def result(filename):
     """返回生成的图片"""
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    print(f"[Result] 请求图片: {filename} -> {filepath}")
+
     if os.path.exists(filepath):
-        return send_file(filepath)
+        try:
+            # 显式指定 mimetype 确保图片正确显示
+            return send_file(filepath, mimetype='image/png')
+        except Exception as e:
+            print(f"[Result] 发送文件失败: {e}")
+            return f"图片读取失败: {str(e)}", 500
+
+    print(f"[Result] 文件不存在: {filepath}")
     return "图片不存在", 404
 
 
