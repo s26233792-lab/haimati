@@ -3,9 +3,8 @@
 
 from app import app
 
-# Vercel 需要的这个 WSGI 应用
-wsgi_app = app
+# Vercel Python 需要导出 app 作为 WSGI 应用
+# 不使用 wsgi_app 变量名
 
-# 如果需要，可以添加 Vercel 特定的配置
 if __name__ == '__main__':
     app.run()
