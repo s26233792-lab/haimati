@@ -783,7 +783,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
     # ==================== 构建简洁的 Prompt ====================
     # 基础指令 - 使用更明确的措辞避免返回原图
-    base_instruction = "根据上传的人像，重新生成一张全新的美式专业职场风格半身肖像"
+    base_instruction = "请根据上传的人像参考，创作一张全新的美式专业职场风格半身肖像。重要：不要返回原图，必须生成全新的图���。"
 
     # 构建具体配置列表
     details = []
@@ -805,7 +805,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         details.append("效果：轻微美颜，自然提亮肤色")
 
     # 拼接最终 Prompt - 强调要重新生成，而不是保持所有东西完全一致
-    prompt_text = base_instruction + "。" + "\n\n" + "\n".join(details) + "。" + "\n\n保持人物的面部特征、发型、性别和年龄，但要完全重新生成场景、服装和背景。超高清，2K分辨率，3:4竖版比例，影棚级布光。"
+    prompt_text = base_instruction + "。" + "\n\n" + "\n".join(details) + "。" + "\n\n重要提示：保持人物的面部识别特征，但必须完全重新生成所有内容 - 新的服装、新的背景、新的布光、新的构图。绝对不能返回原图或仅做简单滤镜处理。超高清，2K分辨率，3:4竖版比例，影棚级布光。"
 
     # 打印调试信息
     print("=" * 70)
@@ -843,7 +843,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 "generationConfig": {
                     "responseModalities": ["TEXT", "IMAGE"],
                     "imageSize": "2K",
-                    "aspectRatio": "3:4"
+                    "aspectRatio": "3:4",
+                    "seed": random_seed  # 添加随机种子确保每次生成不同
                 }
             }
             api_format_name = "banana2 代理格式"
@@ -858,7 +859,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                     ]
                 }],
                 "generationConfig": {
-                    "responseModalities": ["TEXT", "IMAGE"]
+                    "responseModalities": ["TEXT", "IMAGE"],
+                    "seed": random_seed  # 添加随机种子确保每次生成不同
                 }
             }
             api_format_name = "Gemini 原生格式"
