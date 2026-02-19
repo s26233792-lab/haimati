@@ -154,20 +154,31 @@ MODEL_CONFIGS = {
 MODEL_NAME = os.getenv('MODEL_NAME', 'gemini-3-pro-image-preview-2k')
 model_config = MODEL_CONFIGS.get(MODEL_NAME, MODEL_CONFIGS['gemini-3-pro-image-preview-2k'])
 
-# 构建完整的 API URL
-base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
+# 构建完整的 API URL（如果还没有为自定义提供商设置）
+if API_PROVIDER != 'custom':
+    base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
 
 # 检测是否是 Gemini 模型（用于图像生成）
 is_gemini_model = MODEL_NAME.startswith('gemini-')
 
 if is_gemini_model:
-    # Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
-    # 移除 base_url 末尾的 /v1 后缀（如果存在）
-    clean_base_url = base_url.rstrip('/').rstrip('/v1')
-    NANOBANANA_API_URL = f"{clean_base_url}/v1beta/models/{MODEL_NAME}:generateContent"
-    API_FORMAT = 'gemini'
-    print(f"[API] 使用 Gemini 原生格式")
-    print(f"[API] API URL: {NANOBANANA_API_URL}")
+    # 检查是否使用 banana2 代理 API
+    is_banana2_proxy = 'peacedejiai.cc' in base_url
+
+    if is_banana2_proxy and API_PROVIDER == 'custom':
+        # banana2 代理使用 /proxy/generate 端点
+        NANOBANANA_API_URL = f"{base_url.rstrip('/')}/proxy/generate"
+        API_FORMAT = 'gemini'
+        print(f"[API] 使用 banana2 代理格式")
+        print(f"[API] API URL: {NANOBANANA_API_URL}")
+    else:
+        # 其他 Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
+        # 移除 base_url 末尾的 /v1 后缀（如果存在）
+        clean_base_url = base_url.rstrip('/').rstrip('/v1')
+        NANOBANANA_API_URL = f"{clean_base_url}/v1beta/models/{MODEL_NAME}:generateContent"
+        API_FORMAT = 'gemini'
+        print(f"[API] 使用 Gemini 原生格式")
+        print(f"[API] API URL: {NANOBANANA_API_URL}")
 elif API_PROVIDER == '12ai':
     # 12ai 的其他模型使用 OpenAI 格式
     NANOBANANA_API_URL = f"{base_url}/chat/completions"
@@ -816,20 +827,42 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
     # 根据模型类型选择不同的请求格式
     if API_FORMAT == 'gemini':
-        # Gemini 原生格式 (用于 12ai Gemini 模型)
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": prompt_text},
-                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
-                ]
-            }],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"]
+        # 检查是否使用 banana2 代理
+        is_banana2_proxy = 'peacedejiai.cc' in NANOBANANA_API_URL
+
+        if is_banana2_proxy:
+            # banana2 代理格式，需要包含 model 字段
+            payload = {
+                "model": MODEL_NAME,
+                "contents": [{
+                    "parts": [
+                        {"text": prompt_text},
+                        {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                    ]
+                }],
+                "generationConfig": {
+                    "responseModalities": ["TEXT", "IMAGE"],
+                    "imageSize": "2K",
+                    "aspectRatio": "3:4"
+                }
             }
-        }
-        api_format_name = "Gemini 原生格式"
-        payload_type = "Gemini contents/parts 格式"
+            api_format_name = "banana2 代理格式"
+            payload_type = "Gemini SDK 格式 (代理)"
+        else:
+            # Gemini 原生格式 (用于 12ai Gemini 模型)
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt_text},
+                        {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                    ]
+                }],
+                "generationConfig": {
+                    "responseModalities": ["TEXT", "IMAGE"]
+                }
+            }
+            api_format_name = "Gemini 原生格式"
+            payload_type = "Gemini contents/parts 格式"
     else:
         # OpenAI 兼容格式
         payload = {
