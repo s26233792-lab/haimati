@@ -166,10 +166,12 @@ if is_gemini_model:
     is_banana2_proxy = 'peacedejiai.cc' in base_url
 
     if is_banana2_proxy and API_PROVIDER == 'custom':
-        # banana2 代理使用 /proxy/generate 端点
-        NANOBANANA_API_URL = f"{base_url.rstrip('/')}/proxy/generate"
-        API_FORMAT = 'gemini'
-        print(f"[API] 使用 banana2 代理格式")
+        # banana2 代理使用 OpenAI 兼容格式: /v1/chat/completions
+        # 移除 base_url 末尾的 /v1 后缀（如果存在）避免重复
+        clean_base_url = base_url.rstrip('/').rstrip('/v1')
+        NANOBANANA_API_URL = f"{clean_base_url}/v1/chat/completions"
+        API_FORMAT = 'openai'  # 使用 OpenAI 格式
+        print(f"[API] 使用 banana2 代理 (OpenAI 兼容格式)")
         print(f"[API] API URL: {NANOBANANA_API_URL}")
     else:
         # 其他 Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
@@ -827,44 +829,21 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
 
     # 根据模型类型选择不同的请求格式
     if API_FORMAT == 'gemini':
-        # 检查是否使用 banana2 代理
-        is_banana2_proxy = 'peacedejiai.cc' in NANOBANANA_API_URL
-
-        if is_banana2_proxy:
-            # banana2 代理格式，需要包含 model 字段
-            payload = {
-                "model": MODEL_NAME,
-                "contents": [{
-                    "parts": [
-                        {"text": prompt_text},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
-                    ]
-                }],
-                "generationConfig": {
-                    "responseModalities": ["TEXT", "IMAGE"],
-                    "imageSize": "2K",
-                    "aspectRatio": "3:4",
-                    "seed": random_seed  # 添加随机种子确保每次生成不同
-                }
+        # Gemini 原生格式 (用于 12ai Gemini 模型)
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt_text},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                ]
+            }],
+            "generationConfig": {
+                "responseModalities": ["TEXT", "IMAGE"],
+                "seed": random_seed  # 添加随机种子确保每次生成不同
             }
-            api_format_name = "banana2 代理格式"
-            payload_type = "Gemini SDK 格式 (代理)"
-        else:
-            # Gemini 原生格式 (用于 12ai Gemini 模型)
-            payload = {
-                "contents": [{
-                    "parts": [
-                        {"text": prompt_text},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
-                    ]
-                }],
-                "generationConfig": {
-                    "responseModalities": ["TEXT", "IMAGE"],
-                    "seed": random_seed  # 添加随机种子确保每次生成不同
-                }
-            }
-            api_format_name = "Gemini 原生格式"
-            payload_type = "Gemini contents/parts 格式"
+        }
+        api_format_name = "Gemini 原生格式"
+        payload_type = "Gemini contents/parts 格式"
     else:
         # OpenAI 兼容格式
         payload = {
