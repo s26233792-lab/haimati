@@ -3,22 +3,21 @@
 功能：验证码验证、图片上传、API调用、使用次数管理
 """
 
-from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, Response
 from werkzeug.utils import secure_filename
 import sqlite3
 import os
 import random
 import string
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import sys
 import time
-import urllib.parse
+import io
 
 # Windows 控制台编码修复
 if sys.platform == 'win32':
-    import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # 加载环境变量
@@ -1439,22 +1438,32 @@ def status(code):
 
     # 获取生成历史
     conn = get_db_connection()
-    c = get_db_cursor(conn)
-    c.execute('''
-        SELECT style, created_at, result_image
-        FROM generation_logs
-        WHERE code = ?
-        ORDER BY created_at DESC
-    ''', (code,))
-    logs = c.fetchall()
-    conn.close()
+    try:
+        c = get_db_cursor(conn)
+        execute_query(c, '''
+            SELECT style, created_at, result_image
+            FROM generation_logs
+            WHERE code = ?
+            ORDER BY created_at DESC
+        ''', (code,))
+        rows = c.fetchall()
 
-    return jsonify({
-        'success': True,
-        'remaining': result['remaining'],
-        'max_uses': result['max_uses'],
-        'history': [{'style': row[0], 'time': row[1], 'result': row[2]} for row in logs]
-    })
+        # 兼容 PostgreSQL（字典）和 SQLite（元组）
+        history = []
+        for row in rows:
+            if isinstance(row, dict):
+                history.append({'style': row['style'], 'time': row['created_at'], 'result': row['result_image']})
+            else:
+                history.append({'style': row[0], 'time': row[1], 'result': row[2]})
+
+        return jsonify({
+            'success': True,
+            'remaining': result['remaining'],
+            'max_uses': result['max_uses'],
+            'history': history
+        })
+    finally:
+        conn.close()
 
 
 @app.route('/api/showcase')
@@ -1520,7 +1529,7 @@ def admin():
     conn = get_db_connection()
     try:
         c = get_db_cursor(conn)
-        c.execute('SELECT * FROM verification_codes ORDER BY created_at DESC')
+        execute_query(c, 'SELECT * FROM verification_codes ORDER BY created_at DESC')
         codes = fetchall_rows(c)  # 使用 RowProxy 包装
 
         # 预处理统计数据（替代 Jinja2 selectattr 过滤器）
@@ -1586,12 +1595,10 @@ def export_codes():
         codes = [row['code'] if isinstance(row, dict) else row[0] for row in c.fetchall()]
 
         # 返回文本文件
-        import io
         output = io.StringIO()
         for code in codes:
             output.write(f"{code}\n")
 
-        from flask import Response
         return Response(
             output.getvalue(),
             mimetype='text/plain',
@@ -1614,16 +1621,18 @@ def export_security_logs():
             ORDER BY created_at DESC
             LIMIT 1000
         ''')
-        logs = c.fetchall()
+        rows = c.fetchall()
 
         # 返回CSV文件
-        import io
         output = io.StringIO()
         output.write("验证码,IP地址,是否成功,失败原因,时间\n")
-        for log in logs:
-            output.write(f"{log[0] or ''},{log[1] or ''},{log[2]},{log[3] or ''},{log[4]}\n")
+        for row in rows:
+            # 兼容 PostgreSQL（字典）和 SQLite（元组）
+            if isinstance(row, dict):
+                output.write(f"{row.get('code', '') or ''},{row.get('ip_address', '') or ''},{row.get('success', False)},{row.get('failure_reason', '') or ''},{row.get('created_at', '')}\n")
+            else:
+                output.write(f"{row[0] or ''},{row[1] or ''},{row[2]},{row[3] or ''},{row[4]}\n")
 
-        from flask import Response
         return Response(
             output.getvalue(),
             mimetype='text/csv',
@@ -1647,10 +1656,15 @@ def batch_delete():
     try:
         c = get_db_cursor(conn)
 
-        # 使用占位符构建IN查询
-        placeholders = ','.join(['?' for _ in codes])
-        c.execute(f'DELETE FROM verification_codes WHERE code IN ({placeholders})', codes)
+        # 根据数据库类型使用不同的占位符
+        if db_type == 'postgresql':
+            placeholders = ','.join(['%s' for _ in codes])
+            query = f'DELETE FROM verification_codes WHERE code IN ({placeholders})'
+        else:
+            placeholders = ','.join(['?' for _ in codes])
+            query = f'DELETE FROM verification_codes WHERE code IN ({placeholders})'
 
+        c.execute(query, codes)
         deleted = c.rowcount
         conn.commit()
         return jsonify({'success': True, 'deleted': deleted})
