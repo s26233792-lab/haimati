@@ -8,6 +8,10 @@ import sqlite3
 import random
 import string
 import sys
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Windows 控制台编码修复
 if sys.platform == 'win32':

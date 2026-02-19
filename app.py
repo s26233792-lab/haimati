@@ -1719,8 +1719,10 @@ def reset_code():
 init_db()
 
 if __name__ == '__main__':
+    # 支持通过环境变量配置端口
+    port = int(os.getenv('PORT', 5000))
     print("🚀 AI肖像馆 - 美式肖像生成器 启动成功!")
-    print("📍 访问地址: http://localhost:5000")
-    print("🔧 管理后台: http://localhost:5000/admin")
+    print(f"📍 访问地址: http://localhost:{port}")
+    print(f"🔧 管理后台: http://localhost:{port}/admin")
     print("💡 提示: 先运行 generate_codes.py 生成验证码")
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=port)
