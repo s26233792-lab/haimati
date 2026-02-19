@@ -771,8 +771,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         bg_desc = f"质感影棚背景，{color_desc}色调，柔和自然光，背景略微虚化，营造专业氛围"
 
     # ==================== 构建简洁的 Prompt ====================
-    # 基础指令
-    base_instruction = "将上传的人像转换为美式专业职场风格的半身肖像"
+    # 基础指令 - 使用更明确的措辞避免返回原图
+    base_instruction = "根据上传的人像，重新生成一张全新的美式专业职场风格半身肖像"
 
     # 构建具体配置列表
     details = []
@@ -793,8 +793,8 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     if beautify == 'yes':
         details.append("效果：轻微美颜，自然提亮肤色")
 
-    # 拼接最终 Prompt
-    prompt_text = base_instruction + "。" + "\n\n" + "\n".join(details) + "。" + "\n\n保持人物面部特征、发型、性别、年龄特征完全一致。超高清，2K分辨率，3:4竖版比例，影棚级布光。"
+    # 拼接最终 Prompt - 强调要重新生成，而不是保持所有东西完全一致
+    prompt_text = base_instruction + "。" + "\n\n" + "\n".join(details) + "。" + "\n\n保持人物的面部特征、发型、性别和年龄，但要完全重新生成场景、服装和背景。超高清，2K分辨率，3:4竖版比例，影棚级布光。"
 
     # 打印调试信息
     print("=" * 70)
