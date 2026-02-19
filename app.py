@@ -160,10 +160,18 @@ base_url = API_BASE_URLS.get(API_PROVIDER, API_BASE_URLS['12ai'])
 # 检测是否是 Gemini 模型（用于图像生成）
 is_gemini_model = MODEL_NAME.startswith('gemini-')
 
-if is_gemini_model and API_PROVIDER == '12ai':
+if is_gemini_model:
     # Gemini 模型使用原生格式: /v1beta/models/{model}:generateContent
-    NANOBANANA_API_URL = f"{base_url}/models/{MODEL_NAME}:generateContent"
+    # 移除 base_url 末尾的 /v1 后缀（如果存在）
+    clean_base_url = base_url.rstrip('/').rstrip('/v1')
+    NANOBANANA_API_URL = f"{clean_base_url}/v1beta/models/{MODEL_NAME}:generateContent"
     API_FORMAT = 'gemini'
+    print(f"[API] 使用 Gemini 原生格式")
+    print(f"[API] API URL: {NANOBANANA_API_URL}")
+elif API_PROVIDER == '12ai':
+    # 12ai 的其他模型使用 OpenAI 格式
+    NANOBANANA_API_URL = f"{base_url}/chat/completions"
+    API_FORMAT = 'openai'
 else:
     # 其他模型使用 OpenAI 兼容格式: /v1/chat/completions
     NANOBANANA_API_URL = f"{base_url}/chat/completions"
