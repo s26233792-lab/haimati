@@ -825,10 +825,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
                 ]
             }],
             "generationConfig": {
-                "temperature": 0.9,
-                "topP": 0.95,
-                "responseModalities": ["IMAGE"],
-                "imageFormat": "PNG"
+                "responseModalities": ["TEXT", "IMAGE"]
             }
         }
         api_format_name = "Gemini 原生格式"
