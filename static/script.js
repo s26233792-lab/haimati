@@ -4,6 +4,16 @@
 let currentCode = '';
 let selectedFile = null;
 let remainingCount = 0;
+let isGenerating = false;  // 标记是否正在生成
+
+// 页面关闭前警告（生成中）
+window.addEventListener('beforeunload', function(e) {
+    if (isGenerating) {
+        e.preventDefault();
+        e.returnValue = '图片正在生成中，确定要离开吗？生成将中断。';
+        return e.returnValue;
+    }
+});
 
 // 更新背景色标签（根据背景类型显示不同文字）
 function updateColorLabel() {
@@ -118,6 +128,14 @@ function showStep2() {
 
 // 返回步骤2
 function resetToStep2() {
+    // 检查剩余次数
+    if (remainingCount <= 0) {
+        alert('⚠️ 额度已用完！\\n\\n此验证码的使用次数已全部用完，如需继续使用，请更换新的验证码。');
+        // 返回步骤1让用户输入新验证码
+        backToStep1();
+        return;
+    }
+
     step3.style.display = 'none';
     step2.style.display = 'block';
     resultImage.src = '';
@@ -136,9 +154,8 @@ function resetToStep2() {
                 remainingCountSpan.textContent = remainingCount;
 
                 if (remainingCount <= 0) {
-                    generateBtn.disabled = true;
-                    step2Error.textContent = '⚠️ 此验证码的使用次数已用完，请更换验证码';
-                    step2Error.style.display = 'block';
+                    alert('⚠️ 额度已用完！\\n\\n此验证码的使用次数已全部用完，如需继续使用，请更换新的验证码。');
+                    backToStep1();
                 }
             }
         });
@@ -228,11 +245,12 @@ async function generatePortrait() {
     step2Error.style.display = 'none';
     generateBtn.disabled = true;
     progressArea.style.display = 'block';
+    isGenerating = true;  // 标记开始生成
 
-    // 更新进度提示文字
+    // 更新进度提示文字 - 警告不要关闭窗口
     const progressMessage = progressArea.querySelector('p');
     if (progressMessage) {
-        progressMessage.textContent = '⏳ AI 正在生成图片，这可能需要 1-2 分钟，请耐心等待...';
+        progressMessage.innerHTML = '⏳ <strong>AI 正在生成图片，请勿关闭窗口！</strong><br><small>这可能需要 1-2 分钟，请耐心等待...</small>';
     }
 
     // 准备表单数据
@@ -310,6 +328,16 @@ async function generatePortrait() {
             downloadLink.href = data.result_url;
             downloadLink.download = `portrait-${timestamp}.png`;
 
+            // 根据剩余次数显示不同提示
+            const stepHeader = step3.querySelector('.step-header');
+            if (stepHeader) {
+                if (remainingCount > 0) {
+                    stepHeader.querySelector('.text-success').innerHTML = `✓ 生成成功 (剩余 ${remainingCount} 次)`;
+                } else {
+                    stepHeader.querySelector('.text-success').innerHTML = `✓ 生成完成 <small class="text-warning">(额度已用完)</small>`;
+                }
+            }
+
             step2.style.display = 'none';
             step3.style.display = 'block';
         } else {
@@ -366,6 +394,7 @@ async function generatePortrait() {
         }
     } finally {
         progressArea.style.display = 'none';
+        isGenerating = false;  // 生成完成或出错
     }
 }
 
