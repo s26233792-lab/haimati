@@ -406,34 +406,34 @@ async function generatePortrait() {
 
         // 详细的错误分类
         if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-            errorMsg = '⚠️ 无法连接到服务器，请检查网络或稍后重试';
+            errorMsg = '⚠️ 无法连接到服务器，请检查网络或稍后重试<br><small class="text-muted">如��题持续，请截图联系客服</small>';
             isConnectionError = true;
         } else if (error.message) {
             // 检查是否是超时错误
             if (error.message.includes('超时') || error.message.includes('timeout')) {
-                errorMsg = '⚠️ 请求超时，服务器响应时间过长，请稍后重试';
+                errorMsg = '⚠️ 请求超时，服务器响应时间过长，请稍后重试<br><small class="text-muted">如问题持续，请截图联系客服</small>';
                 isTimeout = true;
             }
             // 检查是否是连接错误
             else if (error.message.includes('连接') || error.message.includes('Connection')) {
-                errorMsg = '⚠️ 连接失败，请检查网络设置或代理配置';
+                errorMsg = '⚠️ 连接失败，请检查网络设置或代理配置<br><small class="text-muted">如问题持续，请截图联系客服</small>';
                 isConnectionError = true;
             }
             // 检查是否是断路器错误
             else if (error.message.includes('断路器') || error.message.includes('暂时不可用')) {
-                errorMsg = '⚠️ 服务暂时不可用（断路器保护），请稍后重试';
+                errorMsg = '⚠️ 服务暂时不可用（断路器保护），请稍后重试<br><small class="text-muted">如问题持续，请截图联系客服</small>';
             }
             // 检查是否是代理错误
             else if (error.message.includes('代理') || error.message.includes('Proxy')) {
-                errorMsg = '⚠️ 代理连接失败，请检查代理配置';
+                errorMsg = '⚠️ 代理连接失败，请检查代理配置<br><small class="text-muted">如问题持续，请截图联系客服</small>';
             }
             // 其他错误
             else {
-                errorMsg = `⚠️ 请求失败: ${error.message}`;
+                errorMsg = `⚠️ 请求失败: ${error.message}<br><small class="text-muted">如问题持续，请截图联系客服</small>`;
             }
         }
 
-        step2Error.textContent = errorMsg;
+        step2Error.innerHTML = errorMsg;
         step2Error.style.display = 'block';
         generateBtn.disabled = false;
 
