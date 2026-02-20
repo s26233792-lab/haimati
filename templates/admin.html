@@ -185,6 +185,9 @@
                 <button class="btn btn-outline-secondary" onclick="selectByCondition('exhausted')">
                     <i class="bi bi-x-circle"></i> 选已用完
                 </button>
+                <button class="btn btn-outline-danger" onclick="clearExhaustedCodes()">
+                    <i class="bi bi-trash3"></i> 清除已用完
+                </button>
             </div>
         </div>
 
@@ -689,6 +692,28 @@
             };
 
             modal.show();
+        }
+
+        // 清除已用完的验证码
+        function clearExhaustedCodes() {
+            confirmAction(
+                '确认清除',
+                '确定要清除所有已用完的验证码吗？此操作不可恢复！',
+                async () => {
+                    const response = await fetch('/admin/clear_exhausted', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(data.message || `已清除 ${data.deleted} 个已用完的验证码`);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('操作失败：' + data.message, 'danger');
+                    }
+                }
+            );
         }
 
         // 复制所有新验证码（未使用的）

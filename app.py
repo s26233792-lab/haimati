@@ -1767,6 +1767,24 @@ def batch_reset():
         conn.close()
 
 
+@app.route('/admin/clear_exhausted', methods=['POST'])
+@admin_required
+def clear_exhausted_codes():
+    """清除已用完的验证码（使用次数 >= 最大次数）"""
+    conn = get_db_connection()
+    try:
+        c = get_db_cursor(conn)
+
+        # 删除已用完的验证码（used_count >= max_uses）
+        execute_query(c, 'DELETE FROM verification_codes WHERE used_count >= max_uses')
+
+        deleted = c.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'deleted': deleted, 'message': f'已清除 {deleted} 个已用完的验证码'})
+    finally:
+        conn.close()
+
+
 @app.route('/admin/export_all_csv')
 @admin_required
 def export_all_csv():
