@@ -33,7 +33,7 @@
 # 基础配置
 SECRET_KEY=your-random-secret-key-here
 UPLOAD_FOLDER=uploads
-MAX_CONTENT_LENGTH=16777216
+MAX_CONTENT_LENGTH=5242880  # 5MB
 
 # API 配置（如需接入真实 API）
 NANOBANANA_API_KEY=your-api-key

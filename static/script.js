@@ -197,9 +197,11 @@ function handleFile(file) {
         return;
     }
 
-    // 验证文件大小 (16MB)
-    if (file.size > 16 * 1024 * 1024) {
-        step2Error.textContent = '⚠️ 图片大小不能超过16MB';
+    // 验证��件大小 (5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        step2Error.textContent = `⚠️ 图片大小不能超过5MB，当前文件为 ${sizeMB}MB`;
         step2Error.style.display = 'block';
         return;
     }
