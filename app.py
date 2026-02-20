@@ -1737,6 +1737,69 @@ def reset_code():
         conn.close()
 
 
+@app.route('/admin/batch_reset', methods=['POST'])
+@admin_required
+def batch_reset():
+    """批量重置验证码使用次数"""
+    data = request.json
+    codes = data.get('codes', [])
+
+    if not codes:
+        return jsonify({'success': False, 'message': '未选择验证码'}), 400
+
+    conn = get_db_connection()
+    try:
+        c = get_db_cursor(conn)
+
+        # 根据数据库类型使用不同的占位符
+        if db_type == 'postgresql':
+            placeholders = ','.join(['%s' for _ in codes])
+            query = f'UPDATE verification_codes SET used_count = 0, status = \'active\' WHERE code IN ({placeholders})'
+        else:
+            placeholders = ','.join(['?' for _ in codes])
+            query = f'UPDATE verification_codes SET used_count = 0, status = \'active\' WHERE code IN ({placeholders})'
+
+        c.execute(query, codes)
+        reset_count = c.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'reset': reset_count})
+    finally:
+        conn.close()
+
+
+@app.route('/admin/export_all_csv')
+@admin_required
+def export_all_csv():
+    """导出所有验证码为 CSV 格式（含详细信息）"""
+    conn = get_db_connection()
+    try:
+        c = get_db_cursor(conn)
+        c.execute('''
+            SELECT code, max_uses, used_count, status, created_at
+            FROM verification_codes
+            ORDER BY created_at DESC
+        ''')
+        rows = c.fetchall()
+
+        # 返回CSV文件
+        output = io.StringIO()
+        output.write("验证码,最大使用次数,已使用次数,状态,创建时间\n")
+
+        for row in rows:
+            if isinstance(row, dict):
+                output.write(f"{row.get('code', '')},{row.get('max_uses', 0)},{row.get('used_count', 0)},{'活跃' if row.get('status') == 'active' else '禁用'},{row.get('created_at', '')}\n")
+            else:
+                output.write(f"{row[0]},{row[1]},{row[2]},{'活跃' if row[3] == 'active' else '禁用'},{row[4]}\n")
+
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=all_codes.csv'}
+        )
+    finally:
+        conn.close()
+
+
 # ==================== 启动 ====================
 
 # 初始化数据库（在任何环境下都执行）

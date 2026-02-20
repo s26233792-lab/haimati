@@ -145,19 +145,46 @@
 
         <!-- 操作按钮 -->
         <div class="row mb-4">
-            <div class="col-md-12">
+            <div class="col-md-12 d-flex flex-wrap gap-2">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateModal">
                     <i class="bi bi-plus-circle"></i> 生成新验证码
                 </button>
                 <button class="btn btn-success" onclick="copyAllNewCodes()">
                     <i class="bi bi-clipboard"></i> 复制所有新验证码
                 </button>
-                <a href="/admin/export_codes" class="btn btn-outline-success">
-                    <i class="bi bi-download"></i> 导出验证码
-                </a>
-                <a href="/admin/export_security_logs" class="btn btn-outline-secondary">
-                    <i class="bi bi-shield-check"></i> 导出安全日志
-                </a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-download"></i> 导出验证码
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><h6 class="dropdown-header">导出活跃验证码</h6></li>
+                        <li><a class="dropdown-item" href="/admin/export_codes">
+                            <i class="bi bi-file-text"></i> 导出全部 (TXT)
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportSelectedCodes('txt'); return false;">
+                            <i class="bi bi-check-square"></i> 导出选中 (TXT)
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportAllCodes('csv'); return false;">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> 导出全部 (CSV)
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportSelectedCodes('csv'); return false;">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> 导出选中 (CSV)
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/admin/export_security_logs">
+                            <i class="bi bi-shield-check"></i> 导出安全日志
+                        </a></li>
+                    </ul>
+                </div>
+                <button class="btn btn-outline-primary" onclick="invertSelection()">
+                    <i class="bi bi-arrow-left-right"></i> 反选
+                </button>
+                <button class="btn btn-outline-secondary" onclick="selectByCondition('unused')">
+                    <i class="bi bi-star"></i> 选未使用
+                </button>
+                <button class="btn btn-outline-secondary" onclick="selectByCondition('exhausted')">
+                    <i class="bi bi-x-circle"></i> 选已用完
+                </button>
             </div>
         </div>
 
@@ -289,7 +316,10 @@
         <button class="btn btn-sm btn-success" onclick="batchCopyWithFormat()">
             <i class="bi bi-clipboard-data"></i> 复制(带信息)
         </button>
-        <button class="btn btn-sm btn-danger" onclick="batchDelete()">
+        <button class="btn btn-sm btn-info" onclick="batchReset()">
+            <i class="bi bi-arrow-clockwise"></i> 重置
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="confirmBatchDelete()">
             <i class="bi bi-trash"></i> 删除
         </button>
         <button class="btn btn-sm btn-secondary" onclick="batchDisable()">
@@ -353,6 +383,25 @@
         </div>
     </div>
 
+    <!-- 确认操作模态框 -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalTitle">确认操作</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="confirmModalBody">
+                    确定要执行此操作吗？
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmModalButton">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let selectedCodes = new Set();
@@ -401,6 +450,110 @@
             document.querySelectorAll('.select-all-checkbox').forEach(cb => cb.checked = false);
             selectedCodes.clear();
             updateBatchActions();
+        }
+
+        // 反选
+        function invertSelection() {
+            const checkboxes = document.querySelectorAll('.code-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = !cb.checked;
+                if (cb.checked) {
+                    selectedCodes.add(cb.value);
+                } else {
+                    selectedCodes.delete(cb.value);
+                }
+            });
+            updateBatchActions();
+        }
+
+        // 按条件选择
+        function selectByCondition(condition) {
+            const checkboxes = document.querySelectorAll('.code-checkbox');
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                const usedCount = parseInt(row.cells[3].textContent);
+                const maxUses = parseInt(row.cells[2].textContent);
+
+                let shouldSelect = false;
+                if (condition === 'unused') {
+                    shouldSelect = usedCount === 0;
+                } else if (condition === 'exhausted') {
+                    shouldSelect = usedCount >= maxUses;
+                }
+
+                cb.checked = shouldSelect;
+                if (shouldSelect) {
+                    selectedCodes.add(cb.value);
+                } else {
+                    selectedCodes.delete(cb.value);
+                }
+            });
+            updateBatchActions();
+            showToast(`已选择 ${selectedCodes.size} 个验证码`);
+        }
+
+        // 导出选中的验证码
+        async function exportSelectedCodes(format = 'txt') {
+            if (selectedCodes.size === 0) {
+                showToast('请先选择要导出的验证码', 'warning');
+                return;
+            }
+
+            if (format === 'csv') {
+                // 导出 CSV 格式（带详细信息）
+                let csv = '验证码,最大使用次数,已使用次数,剩余次数,状态,创建时间\n';
+                const checkboxes = document.querySelectorAll('.code-checkbox:checked');
+                checkboxes.forEach(cb => {
+                    const row = cb.closest('tr');
+                    const code = row.querySelector('code').textContent;
+                    const maxUses = row.cells[2].textContent;
+                    const usedCount = row.cells[3].textContent;
+                    const remaining = row.cells[4].textContent;
+                    const status = row.cells[5].textContent.trim();
+                    const createdAt = row.cells[6].textContent;
+                    csv += `${code},${maxUses},${usedCount},${remaining},${status},${createdAt}\n`;
+                });
+                downloadFile(csv, 'selected_codes.csv', 'text/csv');
+            } else {
+                // 导出 TXT 格式
+                const codes = Array.from(selectedCodes).join('\n');
+                downloadFile(codes, 'selected_codes.txt', 'text/plain');
+            }
+            showToast(`成功导出 ${selectedCodes.size} 个验证码`);
+        }
+
+        // 导出所有验证码（CSV 格式）
+        async function exportAllCodes(format = 'csv') {
+            try {
+                const response = await fetch('/admin/export_all_csv');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `all_codes_${format}.${format}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    showToast('成功导出所有验证码');
+                }
+            } catch (err) {
+                showToast('导出失败', 'danger');
+            }
+        }
+
+        // 下载文件辅助函数
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
 
         // 批量复制验证码（纯文本，每行一个）
@@ -477,12 +630,25 @@
         }
 
         // 显示提示消息
-        function showToast(message) {
+        function showToast(message, type = 'success') {
+            const icons = {
+                'success': 'bi-check-circle',
+                'warning': 'bi-exclamation-circle',
+                'danger': 'bi-x-circle',
+                'info': 'bi-info-circle'
+            };
+            const alertClass = {
+                'success': 'alert-success',
+                'warning': 'alert-warning',
+                'danger': 'alert-danger',
+                'info': 'alert-info'
+            };
+
             // 创建toast元素
             const toast = document.createElement('div');
-            toast.className = 'alert alert-success position-fixed';
+            toast.className = `alert ${alertClass[type]} position-fixed`;
             toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 250px; animation: slideIn 0.3s ease;';
-            toast.innerHTML = `<i class="bi bi-check-circle"></i> ${message}`;
+            toast.innerHTML = `<i class="bi ${icons[type]}"></i> ${message}`;
 
             // 添加样式
             if (!document.getElementById('toast-style')) {
@@ -508,6 +674,21 @@
                 toast.style.animation = 'slideOut 0.3s ease';
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
+        }
+
+        // 确认操作辅助函数
+        function confirmAction(title, message, onConfirm) {
+            const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalBody').textContent = message;
+
+            const confirmBtn = document.getElementById('confirmModalButton');
+            confirmBtn.onclick = function() {
+                modal.hide();
+                onConfirm();
+            };
+
+            modal.show();
         }
 
         // 复制所有新验证码（未使用的）
@@ -547,28 +728,69 @@
             }
         }
 
-        async function batchDelete() {
-            if (selectedCodes.size === 0) return;
-
-            if (!confirm(`确定要删除选中的 ${selectedCodes.size} 个验证码吗？`)) return;
-
-            const response = await fetch('/admin/batch_delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ codes: Array.from(selectedCodes) })
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                alert(`成功删除 ${data.deleted} 个验证码`);
-                location.reload();
-            } else {
-                alert('删除失败：' + data.message);
+        // 批量删除（带确认）
+        function confirmBatchDelete() {
+            if (selectedCodes.size === 0) {
+                showToast('请先选择要删除的验证码', 'warning');
+                return;
             }
+            confirmAction(
+                '确认删除',
+                `确定要删除选中的 ${selectedCodes.size} 个验证码吗？此操作不可恢复！`,
+                async () => {
+                    const response = await fetch('/admin/batch_delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ codes: Array.from(selectedCodes) })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(`成功删除 ${data.deleted} 个验证码`);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('删除失败：' + data.message, 'danger');
+                    }
+                }
+            );
+        }
+
+        async function batchDelete() {
+            confirmBatchDelete();
+        }
+
+        // 批量重置
+        function batchReset() {
+            if (selectedCodes.size === 0) {
+                showToast('请先选择要重置的验证码', 'warning');
+                return;
+            }
+            confirmAction(
+                '确认重置',
+                `确定要重置选中的 ${selectedCodes.size} 个验证码的使用次数吗？`,
+                async () => {
+                    const response = await fetch('/admin/batch_reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ codes: Array.from(selectedCodes) })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(`成功重置 ${data.reset} 个验证码`);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('操作失败：' + data.message, 'danger');
+                    }
+                }
+            );
         }
 
         async function batchDisable() {
-            if (selectedCodes.size === 0) return;
+            if (selectedCodes.size === 0) {
+                showToast('请先选择要禁用的验证码', 'warning');
+                return;
+            }
 
             const response = await fetch('/admin/batch_update_status', {
                 method: 'POST',
@@ -578,15 +800,18 @@
 
             const data = await response.json();
             if (data.success) {
-                alert(`成功禁用 ${data.updated} 个验证码`);
-                location.reload();
+                showToast(`成功禁用 ${data.updated} 个验证码`);
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert('操作失败：' + data.message);
+                showToast('操作失败：' + data.message, 'danger');
             }
         }
 
         async function batchEnable() {
-            if (selectedCodes.size === 0) return;
+            if (selectedCodes.size === 0) {
+                showToast('请先选择要启用的验证码', 'warning');
+                return;
+            }
 
             const response = await fetch('/admin/batch_update_status', {
                 method: 'POST',
@@ -596,29 +821,33 @@
 
             const data = await response.json();
             if (data.success) {
-                alert(`成功启用 ${data.updated} 个验证码`);
-                location.reload();
+                showToast(`成功启用 ${data.updated} 个验证码`);
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert('操作失败：' + data.message);
+                showToast('操作失败：' + data.message, 'danger');
             }
         }
 
         async function resetCode(code) {
-            if (!confirm(`确定要重置验证码 ${code} 的使用次数吗？`)) return;
+            confirmAction(
+                '确认重置',
+                `确定要重置验证码 ${code} 的使用次数吗？`,
+                async () => {
+                    const response = await fetch('/admin/reset_code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code })
+                    });
 
-            const response = await fetch('/admin/reset_code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                alert('验证码已重置');
-                location.reload();
-            } else {
-                alert('重置失败：' + data.message);
-            }
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast('验证码已重置');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('重置失败：' + data.message, 'danger');
+                    }
+                }
+            );
         }
 
         // 套餐选择变化时更新显示
