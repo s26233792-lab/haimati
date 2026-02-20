@@ -636,54 +636,6 @@ body {
     color: #94a3b8;
 }
 
-/* 性别选择器 */
-.gender-selector {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-.gender-option {
-    cursor: pointer;
-    flex: 1;
-    min-width: 140px;
-}
-
-.gender-option input[type="radio"] {
-    display: none;
-}
-
-.gender-card {
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    transition: all 0.3s ease;
-    background: white;
-}
-
-.gender-option input[type="radio"]:checked + .gender-card {
-    border-color: #6366f1;
-    background: #f0f4ff;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.gender-card:hover {
-    border-color: #6366f1;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.gender-icon {
-    font-size: 32px;
-    margin-bottom: 8px;
-}
-
-.gender-name {
-    font-weight: 600;
-    color: #334155;
-}
-
 /* 背景色选择器 */
 .color-options {
     margin-top: 16px;
