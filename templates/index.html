@@ -26,7 +26,11 @@
                 </div>
                 <div class="feature-item">
                     <span class="feature-icon">🎨</span>
-                    <span>3种服装风格</span>
+                    <span>8种服装风格</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">👔</span>
+                    <span>男女装区分</span>
                 </div>
                 <div class="feature-item">
                     <span class="feature-icon">🖼️</span>
@@ -43,7 +47,7 @@
             <!-- 头部 -->
             <div class="text-center mb-4">
                 <h1 class="title">使用说明</h1>
-                <p class="subtitle">① 输入验证码 ② 选服装/背景/颜色 ③ 上传照片 ④ 点击生成</p>
+                <p class="subtitle">① 输入验证码 ② 选性别/服装/背景 ③ 上传照片 ④ 点击生成</p>
             </div>
 
             <!-- 步骤1: 输入验证码 -->
@@ -82,20 +86,45 @@
                 </div>
                 <div id="step2Error" class="alert alert-warning" style="display: none;"></div>
                 <div class="step-body">
+                    <!-- 性别选择 -->
+                    <div class="mb-4">
+                        <label class="form-label">① 选择性别</label>
+                        <div class="gender-selector">
+                            <label class="gender-option">
+                                <input type="radio" name="gender" value="male" checked onchange="updateClothingOptions()">
+                                <div class="gender-card">
+                                    <div class="gender-icon">👨</div>
+                                    <div class="gender-name">男士</div>
+                                </div>
+                            </label>
+                            <label class="gender-option">
+                                <input type="radio" name="gender" value="female" onchange="updateClothingOptions()">
+                                <div class="gender-card">
+                                    <div class="gender-icon">👩</div>
+                                    <div class="gender-name">女士</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- 服装选择 -->
                     <div class="mb-4">
-                        <label class="form-label">① 选择服装</label>
+                        <label class="form-label">② 选择服装</label>
                         <select id="clothingSelect" class="form-select form-select-lg">
                             <option value="business_suit">商务西装</option>
-                            <option value="keep_original">和原图保持一致</option>
-                            <option value="formal_dress">正装礼服</option>
+                            <option value="casual_blazer">休闲西装</option>
+                            <option value="casual_pants">休闲装</option>
+                            <option value="casual_shirt">休闲衬衫</option>
+                            <option value="turtleneck">高领毛衣</option>
+                            <option value="tshirt">简约T恤</option>
                             <option value="doctoral_gown">博士学位服</option>
+                            <option value="keep_original">和原图保持一致</option>
                         </select>
                     </div>
 
                     <!-- 拍摄角度选择 -->
                     <div class="mb-4">
-                        <label class="form-label">② 选择拍摄角度</label>
+                        <label class="form-label">③ 选择拍摄角度</label>
                         <div class="angle-selector">
                             <label class="angle-option">
                                 <input type="radio" name="angle" value="front" checked>
@@ -118,7 +147,7 @@
 
                     <!-- 背景选择 -->
                     <div class="mb-4">
-                        <label class="form-label">③ 选择背景</label>
+                        <label class="form-label">④ 选择背景</label>
                         <div class="background-selector">
                             <label class="background-option" data-bg="textured">
                                 <input type="radio" name="background" value="textured" checked onchange="updateColorLabel()">
@@ -178,7 +207,7 @@
 
                     <!-- 图片上传 -->
                     <div class="mb-4">
-                        <label class="form-label">④ 上传照片</label>
+                        <label class="form-label">⑤ 上传照片</label>
                         <div class="upload-area" id="uploadArea">
                             <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" hidden>
                             <div class="upload-placeholder" id="uploadPlaceholder">

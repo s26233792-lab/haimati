@@ -727,17 +727,18 @@ def log_verification_attempt(code, ip_address, success, failure_reason=None):
         conn.close()
 
 
-def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color='white', beautify='no'):
+def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color='white', beautify='no', gender='male'):
     """
     调用图片生成 API (12ai.org NanoBanana Pro)
 
     参数:
         style: 风格 (portrait)
-        clothing: 服装 (business_suit, formal_dress, casual_shirt, turtleneck, tshirt)
+        clothing: 服装 (business_suit, casual_blazer, casual_shirt, turtleneck, tshirt, casual_pants, keep_original)
         angle: 拍摄角度 (front, slight_tilt)
         background: 背景 (textured, solid)
         bg_color: 背景色 (white, gray, blue, black, warm)
         beautify: 是否美颜 (yes, no)
+        gender: 性别 (male, female)
     """
     import base64
     from PIL import Image, ImageFilter, ImageEnhance
@@ -747,15 +748,28 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         image_data = base64.b64encode(f.read()).decode()
 
     # ==================== 构建文本 prompt ====================
-    # 服装处理
+    # 服装处理（性别区分）
     clothing_map = {
-        'business_suit': '商务西装',
-        'formal_dress': '正装礼服',
-        'casual_shirt': '休闲衬衫',
-        'turtleneck': '高领毛衣',
-        'tshirt': '简约T恤',
-        'doctoral_gown': '博士学位服（含学位帽、垂布、长袍）',
-        'keep_original': '和原图保持一致'
+        'male': {
+            'business_suit': '男士商务西装',
+            'casual_blazer': '男士休闲西装外套',
+            'casual_pants': '男士休闲装（T恤搭配休闲裤）',
+            'casual_shirt': '男士休闲衬衫',
+            'turtleneck': '男士高领毛衣',
+            'tshirt': '男士简约T恤',
+            'doctoral_gown': '博士学位服（含学位帽、垂布、长袍）',
+            'keep_original': '和原图保持一致'
+        },
+        'female': {
+            'business_suit': '女士商务西装套装',
+            'casual_blazer': '女士休闲西装外套',
+            'casual_pants': '女士休闲装（上衣搭配休闲裤）',
+            'casual_shirt': '女士休闲衬衫',
+            'turtleneck': '女士高领毛衣',
+            'tshirt': '女士简约T恤',
+            'doctoral_gown': '博士学位服（含学位帽、垂布、长袍）',
+            'keep_original': '和原图保持一致'
+        }
     }
 
     # 背景处理
@@ -795,6 +809,9 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     else:  # textured
         bg_desc = f"质感影棚背景，{color_desc}色调，柔和自然光，背景略微虚化，营造专业氛围"
 
+    # 表情控制 - 自然微笑不露齿，保持原图表情特征
+    expression_desc = "表情：自然微笑，嘴唇闭合，不露牙齿，保持原图的表情特征、气质和神态"
+
     # ==================== 构建简洁的 Prompt ====================
     # 基础指令 - 使用更明确的措辞避免返回原图
     base_instruction = "请根据上传的人像参考，创作一张全新的美式专业职场风格半身肖像。重要：不要返回原图，必须生成全新的图���。"
@@ -802,8 +819,12 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     # 构建具体配置列表
     details = []
 
-    # 服装配置
-    details.append(f"服装：{clothing_map.get(clothing, '商务西装')}")
+    # 表情配置（自然微笑不露齿，保持原图表情）
+    details.append(expression_desc)
+
+    # 服装配置（根据性别选择）
+    gender_clothing_map = clothing_map.get(gender, clothing_map['male'])
+    details.append(f"服装：{gender_clothing_map.get(clothing, '商务西装')}")
 
     # 角度配置
     if angle == 'slight_tilt':
@@ -824,6 +845,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     # 打印调试信息
     print("=" * 70)
     print("📋 生成参数:")
+    print(f"  性别: {gender}")
     print(f"  服装: {clothing}")
     print(f"  角度: {angle}")
     print(f"  背景: {background} + {bg_color}")
@@ -1159,13 +1181,24 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
     # ========== 模拟模式：对图片进行简单处理 ==========
     print(f"[模拟模式] 开始处理图片")
     print(f"[模拟模式] 原图: {image_path}")
-    # 服装名称映射 (用于显示)
+    # 服装名称映射 (用于显示，性别区分)
     clothing_names = {
-        'business_suit': '商务西装',
-        'formal_dress': '正装礼服',
-        'casual_shirt': '休闲衬衫',
-        'turtleneck': '高领毛衣',
-        'tshirt': '简约T恤'
+        'male': {
+            'business_suit': '男士商务西装',
+            'casual_blazer': '男士休闲西装外套',
+            'casual_pants': '男士休闲装',
+            'casual_shirt': '男士休闲衬衫',
+            'turtleneck': '男士高领毛衣',
+            'tshirt': '男士简约T恤'
+        },
+        'female': {
+            'business_suit': '女士商务西装套装',
+            'casual_blazer': '女士休闲西装外套',
+            'casual_pants': '女士休闲装',
+            'casual_shirt': '女士休闲衬衫',
+            'turtleneck': '女士高领毛衣',
+            'tshirt': '女士简约T恤'
+        }
     }
 
     # 背景颜色映射 (用于模拟模式，质感影棚和纯色都支持)
@@ -1290,6 +1323,7 @@ def upload():
     background = request.form.get('background', 'textured')
     bg_color = request.form.get('bgColor', 'white')  # 获取背景色，默认白色
     beautify = request.form.get('beautify', 'no')  # 获取美颜选项，默认不美颜
+    gender = request.form.get('gender', 'male')  # 获取性别选项，默认男性
 
     # 验证验证码
     result, error = verify_code(code)
@@ -1317,9 +1351,9 @@ def upload():
     # 调用 API 生成图片
     try:
         print(f"[Upload] 开始处理上传: {filename}")
-        print(f"[Upload] 配置: style={style}, clothing={clothing}, angle={angle}, bg={background}, color={bg_color}, beautify={beautify}")
+        print(f"[Upload] 配置: style={style}, clothing={clothing}, angle={angle}, bg={background}, color={bg_color}, beautify={beautify}, gender={gender}")
 
-        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify)
+        result_path = call_nanobanana_api(filepath, style, clothing, angle, background, bg_color, beautify, gender)
 
         print(f"[Upload] API 调用成功: {result_path}")
 
