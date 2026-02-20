@@ -380,7 +380,7 @@
                             <i class="bi bi-check-all"></i> 全选
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" onclick="selectUnexportedOnly()">
-                            <i class="bi bi-star"></i> 只选未导出
+                            <i class="bi bi-star"></i> 只选未使用
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" onclick="clearExportSelection()">
                             <i class="bi bi-x"></i> 清空选择
@@ -814,7 +814,9 @@
                 <tr>
                     <td>
                         <input type="checkbox" class="form-check-input export-code-checkbox"
-                               value="${code.code}" data-exported="${code.exported}"
+                               value="${code.code}"
+                               data-exported="${code.exported}"
+                               data-used-count="${code.used_count}"
                                onchange="updateExportSelection()">
                     </td>
                     <td><code>${code.code}</code></td>
@@ -822,9 +824,11 @@
                     <td>${code.used_count}</td>
                     <td><span class="badge bg-${code.status === 'active' ? 'success' : 'secondary'}">${code.status === 'active' ? '活跃' : '禁用'}</span></td>
                     <td>
-                        ${code.exported
-                            ? '<span class="badge bg-secondary">已导出</span>'
-                            : '<span class="badge bg-success">未导出</span>'}
+                        ${code.used_count > 0
+                            ? '<span class="badge bg-warning">已使用</span>'
+                            : (code.exported
+                                ? '<span class="badge bg-secondary">已导出</span>'
+                                : '<span class="badge bg-success">未导出</span>')}
                     </td>
                     <td class="text-muted">${code.created_at}</td>
                 </tr>
@@ -851,11 +855,13 @@
             updateExportSelection();
         }
 
-        // 只选未导出
+        // 只选未使用且未导出的验证码
         function selectUnexportedOnly() {
             document.querySelectorAll('.export-code-checkbox').forEach(cb => {
                 const isExported = cb.getAttribute('data-exported') === 'true';
-                cb.checked = !isExported;
+                const usedCount = parseInt(cb.getAttribute('data-used-count'));
+                // 只选中未使用且未导出的验证码
+                cb.checked = (!isExported && usedCount === 0);
             });
             updateExportSelection();
         }
