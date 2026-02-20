@@ -546,9 +546,15 @@ def init_db():
                     max_uses INTEGER DEFAULT 3,
                     used_count INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'active'
+                    status TEXT DEFAULT 'active',
+                    exported BOOLEAN DEFAULT FALSE
                 )
             ''')
+            # 为已存在的表添加 exported 字段（如果不存在）
+            try:
+                c.execute("ALTER TABLE verification_codes ADD COLUMN IF NOT EXISTS exported BOOLEAN DEFAULT FALSE")
+            except:
+                pass
         else:
             # SQLite 语法
             c.execute('''
@@ -557,9 +563,15 @@ def init_db():
                     max_uses INTEGER DEFAULT 3,
                     used_count INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'active'
+                    status TEXT DEFAULT 'active',
+                    exported BOOLEAN DEFAULT 0
                 )
             ''')
+            # 为已存在的表添加 exported 字段（如果不存在）
+            try:
+                c.execute("ALTER TABLE verification_codes ADD COLUMN exported BOOLEAN DEFAULT 0")
+            except:
+                pass
 
         # 生成记录表
         if db_type == 'postgresql':
@@ -1609,6 +1621,16 @@ def export_codes():
         for code in codes:
             output.write(f"{code}\n")
 
+        # 标记为已导出
+        if codes:
+            if db_type == 'postgresql':
+                placeholders = ','.join(['%s' for _ in codes])
+                execute_query(c, f"UPDATE verification_codes SET exported = TRUE WHERE code IN ({placeholders})", codes)
+            else:
+                placeholders = ','.join(['?' for _ in codes])
+                execute_query(c, f"UPDATE verification_codes SET exported = 1 WHERE code IN ({placeholders})", codes)
+            conn.commit()
+
         return Response(
             output.getvalue(),
             mimetype='text/plain',
@@ -1814,6 +1836,84 @@ def export_all_csv():
             mimetype='text/csv',
             headers={'Content-Disposition': 'attachment; filename=all_codes.csv'}
         )
+    finally:
+        conn.close()
+
+
+@app.route('/admin/get_exportable_codes')
+@admin_required
+def get_exportable_codes():
+    """获取���导出的验证码列表（用于导出对话框）"""
+    conn = get_db_connection()
+    try:
+        c = get_db_cursor(conn)
+        c.execute('''
+            SELECT code, max_uses, used_count, status, created_at, exported
+            FROM verification_codes
+            WHERE status = 'active'
+            ORDER BY created_at DESC
+        ''')
+        rows = c.fetchall()
+
+        codes = []
+        for row in rows:
+            if isinstance(row, dict):
+                codes.append({
+                    'code': row.get('code', ''),
+                    'max_uses': row.get('max_uses', 0),
+                    'used_count': row.get('used_count', 0),
+                    'status': row.get('status', 'active'),
+                    'created_at': row.get('created_at', ''),
+                    'exported': bool(row.get('exported', False))
+                })
+            else:
+                codes.append({
+                    'code': row[0],
+                    'max_uses': row[1],
+                    'used_count': row[2],
+                    'status': row[3],
+                    'created_at': row[4],
+                    'exported': bool(row[5]) if len(row) > 5 else False
+                })
+
+        return jsonify({'success': True, 'codes': codes})
+    finally:
+        conn.close()
+
+
+@app.route('/admin/export_selected_codes', methods=['POST'])
+@admin_required
+def export_selected_codes():
+    """导出选中的验证码并标记为已导出"""
+    data = request.json
+    codes = data.get('codes', [])
+
+    if not codes:
+        return jsonify({'success': False, 'message': '未选择验证码'}), 400
+
+    conn = get_db_connection()
+    try:
+        c = get_db_cursor(conn)
+
+        # 返回文本文件
+        output = io.StringIO()
+        for code in codes:
+            output.write(f"{code}\n")
+
+        # 标记为已导出
+        if db_type == 'postgresql':
+            placeholders = ','.join(['%s' for _ in codes])
+            execute_query(c, f"UPDATE verification_codes SET exported = TRUE WHERE code IN ({placeholders})", codes)
+        else:
+            placeholders = ','.join(['?' for _ in codes])
+            execute_query(c, f"UPDATE verification_codes SET exported = 1 WHERE code IN ({placeholders})", codes)
+        conn.commit()
+
+        return jsonify({
+            'success': True,
+            'exported': len(codes),
+            'content': output.getvalue()
+        })
     finally:
         conn.close()
 
