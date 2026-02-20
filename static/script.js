@@ -24,55 +24,6 @@ function updateColorLabel() {
     }
 }
 
-// 根据性别更新服装选项
-function updateClothingOptions() {
-    const gender = document.querySelector('input[name="gender"]:checked').value;
-    const clothingSelect = document.getElementById('clothingSelect');
-
-    // 定义男女服装选项
-    const clothingOptions = {
-        male: [
-            { value: 'business_suit', text: '商务西装' },
-            { value: 'casual_blazer', text: '休闲西装' },
-            { value: 'casual_pants', text: '休闲装' },
-            { value: 'casual_shirt', text: '休闲衬衫' },
-            { value: 'turtleneck', text: '高领毛衣' },
-            { value: 'tshirt', text: '简约T恤' },
-            { value: 'doctoral_gown', text: '博士学位服' },
-            { value: 'keep_original', text: '和原图保持一致' }
-        ],
-        female: [
-            { value: 'business_suit', text: '商务西装套装' },
-            { value: 'casual_blazer', text: '休闲西装外套' },
-            { value: 'casual_pants', text: '休闲装' },
-            { value: 'casual_shirt', text: '休闲衬衫' },
-            { value: 'turtleneck', text: '高领毛衣' },
-            { value: 'tshirt', text: '简约T恤' },
-            { value: 'doctoral_gown', text: '博士学位服' },
-            { value: 'keep_original', text: '和原图保持一致' }
-        ]
-    };
-
-    // 保存当前选中的值
-    const currentValue = clothingSelect.value;
-
-    // 清空选项
-    clothingSelect.innerHTML = '';
-
-    // 添加新选项
-    const options = clothingOptions[gender] || clothingOptions.male;
-    options.forEach(option => {
-        const optElement = document.createElement('option');
-        optElement.value = option.value;
-        optElement.textContent = option.text;
-        clothingSelect.appendChild(optElement);
-    });
-
-    // 尝试恢复之前选中的值，如果不存在则选择第一个
-    const optionExists = Array.from(clothingSelect.options).some(opt => opt.value === currentValue);
-    clothingSelect.value = optionExists ? currentValue : 'business_suit';
-}
-
 // DOM 元素
 const codeInput = document.getElementById('codeInput');
 const codeError = document.getElementById('codeError');
@@ -286,7 +237,6 @@ async function generatePortrait() {
     }
 
     // 获取选中的配置
-    const gender = document.querySelector('input[name="gender"]:checked').value;
     const clothing = document.getElementById('clothingSelect').value;
     const angle = document.querySelector('input[name="angle"]:checked').value;
     const background = document.querySelector('input[name="background"]:checked').value;
@@ -310,7 +260,6 @@ async function generatePortrait() {
     formData.append('image', selectedFile);
     formData.append('code', currentCode);
     formData.append('style', 'portrait');  // 固定使用 portrait 风格
-    formData.append('gender', gender);
     formData.append('clothing', clothing);
     formData.append('angle', angle);
     formData.append('background', background);
