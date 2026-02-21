@@ -24,6 +24,10 @@ if sys.platform == 'win32':
 from dotenv import load_dotenv
 load_dotenv()
 
+# ==================== 测试验证码配置 ====================
+# 测试验证码（无限次数使用，仅用于开发测试）
+TEST_VERIFICATION_CODE = 'TEST8888'
+
 # ==================== 数据库配置 ====================
 # 支持 PostgreSQL (Railway 生产环境) 和 SQLite (本地开发)
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -626,6 +630,17 @@ def init_db():
             ''')
 
         conn.commit()
+
+        # 插入测试验证码（如果不存在）
+        try:
+            execute_query(c, 'SELECT code FROM verification_codes WHERE code = ?', (TEST_VERIFICATION_CODE,))
+            if not c.fetchone():
+                execute_query(c, 'INSERT INTO verification_codes (code, max_uses, status) VALUES (?, 999999, \'active\')', (TEST_VERIFICATION_CODE,))
+                conn.commit()
+                print(f"[DB] 测试验证码已添加: {TEST_VERIFICATION_CODE} (无限次数)")
+        except Exception as e:
+            print(f"[DB] 添加测试验证码失败: {e}")
+
         print(f"[DB] 数据库初始化成功 (类型: {db_type})")
     except Exception as e:
         print(f"[DB] 数据库初始化失败: {e}")
@@ -641,6 +656,10 @@ def allowed_file(filename):
 
 def verify_code(code):
     """验证验证码并返回剩余次数"""
+    # 测试验证码（无限次数）
+    if code == TEST_VERIFICATION_CODE:
+        return {'max_uses': 999999, 'used_count': 0, 'remaining': '无限', 'is_test': True}, None
+
     conn = get_db_connection()
     try:
         c = get_db_cursor(conn)
@@ -669,13 +688,17 @@ def verify_code(code):
         if remaining <= 0:
             return None, "验证码使用次数已用完"
 
-        return {'max_uses': max_uses, 'used_count': used_count, 'remaining': remaining}, None
+        return {'max_uses': max_uses, 'used_count': used_count, 'remaining': remaining, 'is_test': False}, None
     finally:
         conn.close()
 
 
 def use_code(code):
-    """使用验证码（扣减次数）"""
+    """使用验证码（扣减次数��"""
+    # 测试验证码不扣减次数
+    if code == TEST_VERIFICATION_CODE:
+        return
+
     conn = get_db_connection()
     try:
         c = get_db_cursor(conn)
@@ -1928,8 +1951,9 @@ init_db()
 if __name__ == '__main__':
     # 支持通过环境变量配置端口
     port = int(os.getenv('PORT', 5000))
-    print("🚀 AI肖像馆 - 美式肖像生成器 启动成功!")
+    print("🚀 AI肖像馆 - 美式肖像生成器 ���动成功!")
     print(f"📍 访问地址: http://localhost:{port}")
     print(f"🔧 管理后台: http://localhost:{port}/admin")
+    print(f"🧪 测试验证码: {TEST_VERIFICATION_CODE} (无限次数)")
     print("💡 提示: 先运行 generate_codes.py 生成验证码")
     app.run(debug=False, host='0.0.0.0', port=port)
