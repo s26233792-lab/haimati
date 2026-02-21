@@ -766,7 +766,7 @@ def call_nanobanana_api(image_path, style, clothing, angle, background, bg_color
         'white': '白色',
         'gray': '灰色',
         'blue': '蓝色',
-        'black': '深灰色',
+        'pink': '粉色',
         'warm': '暖米色'
     }
 

@@ -694,6 +694,11 @@ body {
     margin-top: 4px;
 }
 
+.color-desc {
+    font-size: 11px;
+    color: #64748b;
+}
+
 /* 触摸设备反馈 */
 @media (hover: none) and (pointer: coarse) {
     .btn:active {
